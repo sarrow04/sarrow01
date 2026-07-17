@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>分析コード調書ジェネレーター | 実務フロー完全版</title>
+<title>分析コード調書ジェネレーター | 実務フロー完全版 v2</title>
 <style>
   :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; --border: #ccc; --colab-bg: #f8f9fa; }
   body { background: var(--paper); color: var(--ink); font-family: sans-serif; padding: 20px; font-size: 13px; }
@@ -89,6 +89,9 @@
         </div>
         <label>新規特徴量作成 (Pandas式)</label>
         <textarea id="feat_code" placeholder="df['単価'] = df['売上'] / df['数量']"></textarea>
+        
+        <label style="margin-top: 10px; color: #16213e;">中間データの保存先 (CSVファイル名)</label>
+        <input type="text" id="clean_export" value="cleaned_data.csv">
       </div>
 
       <div class="step">
@@ -186,6 +189,7 @@ document.getElementById('genModelBtn').addEventListener('click', function() {
   const flagCols = document.getElementById('flag_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
   const catCols = document.getElementById('cat_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
   const featCode = document.getElementById('feat_code').value.trim();
+  const cleanExport = document.getElementById('clean_export').value.trim() || 'cleaned_data.csv';
   const target = document.getElementById('target').value || 'target';
   const featsStr = document.getElementById('feats').value.trim();
   const mlTask = document.getElementById('ml_task').value;
@@ -223,36 +227,39 @@ document.getElementById('genModelBtn').addEventListener('click', function() {
   if (featCode) cell2 += `\n# 新規特徴量作成\n${featCode}\n`;
   cell2 += `\n# 多重共線性チェック (相関行列)\nplt.figure(figsize=(10, 8))\nsns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm')\nplt.title('本番データの相関行列')\nplt.show()\n`;
 
-  let cell3 = `# 【フェーズ2: セル3】モデリングと評価\ntarget = '${target}'\n`;
-  if (featsStr) cell3 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
-  else cell3 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
+  let cell3 = `# 【フェーズ2: セル3】前処理済みデータの中間保存\nclean_filepath = '${cleanExport}'\ndf.to_csv(clean_filepath, index=False, encoding='utf-8-sig')\nprint(f"前処理・特徴量生成済みのデータを '{clean_filepath}' に保存しました。")\n\n# ※必要に応じてColabからローカルへダウンロード\n# from google.colab import files\n# files.download(clean_filepath)\n`;
+
+  let cell4 = `# 【フェーズ2: セル4】モデリングと評価\ntarget = '${target}'\n`;
+  if (featsStr) cell4 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
+  else cell4 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
   
-  cell3 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
+  cell4 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
 
   let modelInst = '';
   if (mlTask === 'reg') {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMRegressor(random_state=42)';
     else if (mlAlgo === 'lr') modelInst = 'LinearRegression()';
     else if (mlAlgo === 'dt') modelInst = 'DecisionTreeRegressor(max_depth=4, random_state=42)';
-    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\n`;
+    cell4 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\n`;
   } else {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMClassifier(random_state=42)';
     else if (mlAlgo === 'lr') modelInst = 'LogisticRegression(random_state=42, max_iter=1000)';
     else if (mlAlgo === 'dt') modelInst = 'DecisionTreeClassifier(max_depth=4, random_state=42)';
-    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
+    cell4 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
   }
-  if (mlAlgo === 'dt') cell3 += `\n# 決定木の描画\nplt.figure(figsize=(15, 10))\ntree.plot_tree(model, feature_names=features, filled=True, rounded=True, max_depth=3)\nplt.show()\n`;
+  if (mlAlgo === 'dt') cell4 += `\n# 決定木の描画\nplt.figure(figsize=(15, 10))\ntree.plot_tree(model, feature_names=features, filled=True, rounded=True, max_depth=3)\nplt.show()\n`;
 
-  let cell4 = `# 【フェーズ2: セル4】SHAP要因分析とログ保存\n`;
-  if (mlAlgo === 'lr') cell4 += `explainer = shap.LinearExplainer(model, X_train)\n`;
-  else cell4 += `explainer = shap.TreeExplainer(model)\n`;
-  cell4 += `shap_values = explainer.shap_values(X_test)\nplt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_content = f"ログ (Version: ${info.version})\\n分析者: ${info.author}\\n目的変数: {target}\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n"\nwith open("analysis_log.txt", 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint("証跡を保存しました。")\n`;
+  let cell5 = `# 【フェーズ2: セル5】SHAP要因分析とログ保存\n`;
+  if (mlAlgo === 'lr') cell5 += `explainer = shap.LinearExplainer(model, X_train)\n`;
+  else cell5 += `explainer = shap.TreeExplainer(model)\n`;
+  cell5 += `shap_values = explainer.shap_values(X_test)\nplt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_content = f"ログ (Version: ${info.version})\\n分析者: ${info.author}\\n目的変数: {target}\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n"\nwith open("analysis_log.txt", 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint("証跡を保存しました。")\n`;
 
   renderCells([
-    { title: '🚀 セル 1/4: 本番読込 (絞り込み・型指定後)', code: cell1 },
-    { title: '🚀 セル 2/4: 前処理と共線性チェック', code: cell2 },
-    { title: '🚀 セル 3/4: モデリングと評価', code: cell3 },
-    { title: '🚀 セル 4/4: 要因特定とログ保存', code: cell4 }
+    { title: '🚀 セル 1/5: 本番読込 (絞り込み・型指定後)', code: cell1 },
+    { title: '🚀 セル 2/5: 前処理と共線性チェック', code: cell2 },
+    { title: '🚀 セル 3/5: 前処理済みデータの中間保存', code: cell3 },
+    { title: '🚀 セル 4/5: モデリングと評価', code: cell4 },
+    { title: '🚀 セル 5/5: 要因特定とログ保存', code: cell5 }
   ]);
 });
 </script>
