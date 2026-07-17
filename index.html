@@ -2,45 +2,47 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>分析コード調書ジェネレーター | マスター版</title>
+<title>分析コード調書ジェネレーター | 実務フロー完全版</title>
 <style>
   :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; --border: #ccc; --colab-bg: #f8f9fa; }
   body { background: var(--paper); color: var(--ink); font-family: sans-serif; padding: 20px; font-size: 13px; }
-  main { max-width: 1400px; margin: auto; display: grid; grid-template-columns: 420px 1fr; gap: 20px; }
+  main { max-width: 1400px; margin: auto; display: grid; grid-template-columns: 450px 1fr; gap: 20px; }
   .panel { background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
-  .step { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px; }
-  .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
-  h2 { font-size: 14px; color: var(--navy); border-left: 4px solid var(--gold); padding-left: 8px; margin-top: 0; }
+  .phase-box { border: 2px solid var(--navy); border-radius: 6px; padding: 15px; margin-bottom: 20px; background: #fafafa; }
+  .phase-title { background: var(--navy); color: #fff; display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: bold; margin-top: -30px; margin-bottom: 10px; font-size: 12px; }
+  .step { margin-bottom: 15px; }
+  h2 { font-size: 13px; color: var(--navy); border-left: 4px solid var(--gold); padding-left: 8px; margin-top: 0; margin-bottom: 8px; }
   label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px; color: #444; }
   input[type="text"], select, textarea { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; font-size: 12px; }
-  textarea { resize: vertical; min-height: 60px; font-family: monospace; }
+  textarea { resize: vertical; min-height: 50px; font-family: monospace; }
   .checkbox-label { display: flex; align-items: center; font-weight: normal; font-size: 12px; cursor: pointer; margin-bottom: 5px; }
   .checkbox-label input { width: auto; margin-right: 5px; }
-  button.generate { background: var(--navy); color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; }
-  button.generate:hover { background: #1a2a52; }
+  button { color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 5px; transition: 0.2s; }
+  button.btn-eda { background: #2e8b57; }
+  button.btn-eda:hover { background: #236b43; }
+  button.btn-model { background: var(--navy); }
+  button.btn-model:hover { background: #1a2a52; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .desc { font-size: 11px; color: #666; margin-bottom: 10px; line-height: 1.4; }
   
   .cell-container { margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
-  .cell-header { background: #eaeaea; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #ddd; }
-  .cell-code { background: var(--colab-bg); padding: 15px; margin: 0; font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; color: #333; }
+  .cell-header { background: #eaeaea; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #ddd; color: #333; }
+  .cell-code { background: var(--colab-bg); padding: 15px; margin: 0; font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; color: #222; }
 </style>
 </head>
 <body>
 <main>
-  <div class="panel">
-    <h1>⚙️ スペシャリスト分析設定</h1>
-    
-    <div class="step">
-      <h2>00. 環境・バージョン</h2>
-      <div class="grid-2">
-        <div><label>バージョン</label><input type="text" id="version" value="v1.0.0"></div>
-        <div><label>分析者名</label><input type="text" id="author" value="Suzuki Shinya"></div>
-      </div>
-      <label class="checkbox-label"><input type="checkbox" id="use_colab" checked> Google Colab用セットアップを含む</label>
+  <div class="panel" id="sidebar">
+    <div class="step grid-2" style="margin-bottom: 20px;">
+      <div><label>バージョン</label><input type="text" id="version" value="v1.0.0"></div>
+      <div><label>分析者名</label><input type="text" id="author" value="Suzuki Shinya"></div>
     </div>
 
-    <div class="step">
-      <h2>01. 読込設定 (型・日付対応)</h2>
+    <!-- フェーズ1: データ初期診断 -->
+    <div class="phase-box">
+      <div class="phase-title">フェーズ1: データの初期プロファイリング</div>
+      <p class="desc">まずは対象ファイルを読み込み、Colab上でヒストグラムや欠損値・異常値を確認して、方針を決定します。</p>
+      
       <div class="grid-2">
         <div>
           <label>ファイル形式</label>
@@ -53,95 +55,142 @@
       </div>
       <label>ファイルパス</label>
       <input type="text" id="filepath" value="data.csv">
-      <label>読み込むカラム (カンマ区切り。空白で全カラム)</label>
-      <input type="text" id="usecols" placeholder="例: 社員番号, 日付, 売上">
-      <label>データ型の指定 (カンマ区切り。0落ち防止はstrを指定)</label>
-      <input type="text" id="dtypes" placeholder="例: 社員番号:str, 売上:float">
-      <label>日付型として読み込むカラム (カンマ区切り)</label>
-      <input type="text" id="parse_dates" placeholder="例: 登録日, 更新日時">
+      
+      <button class="btn-eda" id="genEdaBtn">🔍 1. 初期診断コードを出力</button>
     </div>
 
-    <div class="step">
-      <h2>02. クレンジング・特徴量生成</h2>
-      <label>欠損値の処理</label>
-      <select id="fillna">
-        <option value="median">数値は中央値、カテゴリは最頻値で補完</option>
-        <option value="mean">数値は平均値、カテゴリは最頻値で補完</option>
-        <option value="dropna">欠損を含む行を削除</option>
-      </select>
-      <label>フラグの数値化 (例: 'Yes'/'No' -> 1/0)</label>
-      <input type="text" id="flag_cols" placeholder="例: 退職フラグ">
-      <label>One-Hot Encoding (ダミー変数化)</label>
-      <input type="text" id="cat_cols" placeholder="例: 部署名">
-      <label>新規特徴量作成 (Pandas式を複数行入力可)</label>
-      <textarea id="feat_code" placeholder="df['単価'] = df['売上'] / df['数量']"></textarea>
-    </div>
+    <!-- フェーズ2: 本番モデリング -->
+    <div class="phase-box">
+      <div class="phase-title">フェーズ2: 本番パイプライン構築</div>
+      <p class="desc">フェーズ1の診断結果をもとに、必要なカラムやデータ型を指定してモデルを構築します。</p>
+      
+      <div class="step">
+        <h2>読込・型指定 (診断結果を反映)</h2>
+        <label>読み込むカラム (空白で全カラム)</label>
+        <input type="text" id="usecols" placeholder="例: 社員番号, 年齢, 売上">
+        <label>データ型の指定 (0落ち防止はstr等)</label>
+        <input type="text" id="dtypes" placeholder="例: 社員番号:str, 部署:category">
+        <label>日付型として読み込むカラム</label>
+        <input type="text" id="parse_dates" placeholder="例: 入社日">
+      </div>
 
-    <div class="step">
-      <h2>03. グラフ・EDA設定</h2>
-      <label class="checkbox-label"><input type="checkbox" id="plot_corr" checked> 相関行列ヒートマップを表示 (多重共線性チェック)</label>
-      <label class="checkbox-label"><input type="checkbox" id="plot_target"> 目的変数と各特徴量の関係をグラフ化 (散布図/箱ひげ図)</label>
-    </div>
-
-    <div class="step">
-      <h2>04. 機械学習設定</h2>
-      <label>目的変数</label>
-      <input type="text" id="target" placeholder="例: 売上金額">
-      <label>特徴量 (空白で目的変数以外すべて)</label>
-      <input type="text" id="feats" placeholder="例: 年齢, 勤続年数">
-      <div class="grid-2">
-        <div>
-          <label>タスク</label>
-          <select id="ml_task"><option value="reg">回帰 (数値予測)</option><option value="clf">分類 (確率予測)</option></select>
+      <div class="step">
+        <h2>クレンジング・特徴量生成</h2>
+        <label>欠損値の処理</label>
+        <select id="fillna">
+          <option value="median">数値は中央値、カテゴリは最頻値で補完</option>
+          <option value="mean">数値は平均値、カテゴリは最頻値で補完</option>
+          <option value="dropna">欠損を含む行を削除</option>
+        </select>
+        <label>フラグの数値化 / ダミー変数化</label>
+        <div class="grid-2">
+          <input type="text" id="flag_cols" placeholder="フラグ化: 退職フラグ">
+          <input type="text" id="cat_cols" placeholder="ダミー化: 部署名">
         </div>
-        <div>
-          <label>アルゴリズム</label>
-          <select id="ml_algo">
-            <option value="lr">線形回帰 / ロジスティック回帰 (シンプル)</option>
-            <option value="dt">決定木 (シンプル・解釈容易)</option>
-            <option value="lgb">LightGBM (高速・高精度)</option>
-            <option value="rf">Random Forest (安定)</option>
-            <option value="xgb">XGBoost (Kaggle標準)</option>
-          </select>
+        <label>新規特徴量作成 (Pandas式)</label>
+        <textarea id="feat_code" placeholder="df['単価'] = df['売上'] / df['数量']"></textarea>
+      </div>
+
+      <div class="step">
+        <h2>機械学習設定</h2>
+        <label>目的変数</label>
+        <input type="text" id="target" placeholder="例: 利益">
+        <label>特徴量 (空白で目的変数以外すべて)</label>
+        <input type="text" id="feats" placeholder="例: 年齢, 勤続年数">
+        <div class="grid-2">
+          <div>
+            <label>タスク</label>
+            <select id="ml_task"><option value="reg">回帰 (数値予測)</option><option value="clf">分類 (確率予測)</option></select>
+          </div>
+          <div>
+            <label>アルゴリズム</label>
+            <select id="ml_algo">
+              <option value="lr">線形/ロジスティック回帰</option>
+              <option value="dt">決定木 (解釈容易)</option>
+              <option value="lgb">LightGBM (高精度)</option>
+            </select>
+          </div>
         </div>
       </div>
-    </div>
 
-    <button class="generate" id="generateBtn">🚀 セル分割コードを生成</button>
+      <button class="btn-model" id="genModelBtn">🚀 2. 本番モデリングコードを出力</button>
+    </div>
   </div>
   
   <div class="panel" id="outputPanel" style="background: #fff; padding: 20px;">
-    <p style="color: #666; text-align: center; margin-top: 50px;">左側の設定を入力し、「生成」をクリックすると<br>Colabのセル単位に分割されたコードが出力されます。</p>
+    <div style="text-align: center; color: #666; margin-top: 40px; line-height: 1.6;">
+      <h3 style="color: var(--navy);">【実務のデータ分析フロー】</h3>
+      1. 左側の「フェーズ1」で対象ファイルを指定し、<b>「初期診断コード」</b>を出力・実行します。<br>
+      2. Colab上で<b>異常値</b>や<b>ヒストグラム</b>、<b>欠損状況</b>を確認します。<br>
+      3. その結果を踏まえ、「フェーズ2」で<b>必要なカラム</b>や<b>適切なデータ型</b>を指定し、<br>
+      <b>「本番モデリングコード」</b>を出力してください。
+    </div>
   </div>
 </main>
 
 <script>
-document.getElementById('generateBtn').addEventListener('click', function() {
-  const version = document.getElementById('version').value || 'v1.0.0';
-  const author = document.getElementById('author').value || 'Suzuki Shinya';
-  const useColab = document.getElementById('use_colab').checked;
-  const filetype = document.getElementById('filetype').value;
-  const filepath = document.getElementById('filepath').value;
-  const encoding = document.getElementById('encoding').value;
+// 共通情報の取得
+function getBasicInfo() {
+  return {
+    version: document.getElementById('version').value || 'v1.0.0',
+    author: document.getElementById('author').value || 'Suzuki Shinya',
+    filetype: document.getElementById('filetype').value,
+    filepath: document.getElementById('filepath').value,
+    encoding: document.getElementById('encoding').value
+  };
+}
+
+// パネル描画関数
+function renderCells(cells) {
+  const outputPanel = document.getElementById('outputPanel');
+  outputPanel.innerHTML = '';
+  cells.forEach(c => {
+    const container = document.createElement('div');
+    container.className = 'cell-container';
+    container.innerHTML = `
+      <div class="cell-header">${c.title}</div>
+      <pre class="cell-code">${c.code}</pre>
+    `;
+    outputPanel.appendChild(container);
+  });
+}
+
+// フェーズ1: 初期診断コード生成
+document.getElementById('genEdaBtn').addEventListener('click', function() {
+  const info = getBasicInfo();
+  
+  let cell1 = `# 【フェーズ1: セル1】環境構築とデータ読み込み (全データ)\n!pip install japanize-matplotlib -q\nimport japanize_matplotlib\nimport pandas as pd\nimport numpy as np\nimport matplotlib.pyplot as plt\nimport seaborn as sns\n\n# データの読み込み\n`;
+  if (info.filetype === 'csv') cell1 += `df = pd.read_csv('${info.filepath}', encoding='${info.encoding}')\n`;
+  else cell1 += `df = pd.read_excel('${info.filepath}')\n`;
+  cell1 += `print("データサイズ:", df.shape)\ndisplay(df.head())\n`;
+
+  let cell2 = `# 【フェーズ1: セル2】データ型と欠損値の確認\nprint("=== データ型の確認 ===")\ndf.info()\n\nprint("\\n=== 欠損値の状況 ===")\nmissing = df.isnull().sum()\nprint(missing[missing > 0])\n\n# 欠損値マップ\nplt.figure(figsize=(10, 4))\nsns.heatmap(df.isnull(), cbar=False, cmap='viridis')\nplt.title('欠損値の分布状況')\nplt.show()\n`;
+
+  let cell3 = `# 【フェーズ1: セル3】異常値とヒストグラムの確認 (基本統計量)\ndisplay(df.describe(include='all'))\n\n# 数値変数のヒストグラム\nnum_cols = df.select_dtypes(include=['int64', 'float64']).columns\nif len(num_cols) > 0:\n    df[num_cols].hist(bins=30, figsize=(15, max(4, len(num_cols))), layout=(-1, 3), edgecolor='black')\n    plt.suptitle('数値変数のヒストグラム (分布と異常値の確認)', y=1.02)\n    plt.tight_layout()\n    plt.show()\nelse:\n    print("数値変数が存在しません。")\n`;
+
+  renderCells([
+    { title: '📝 セル 1/3: データの読み込み', code: cell1 },
+    { title: '📝 セル 2/3: 型と欠損値の確認', code: cell2 },
+    { title: '📝 セル 3/3: 異常値とヒストグラムの確認', code: cell3 }
+  ]);
+});
+
+// フェーズ2: 本番モデリングコード生成
+document.getElementById('genModelBtn').addEventListener('click', function() {
+  const info = getBasicInfo();
   
   const usecolsRaw = document.getElementById('usecols').value.split(',').map(s=>s.trim()).filter(s=>s);
   const dtypesRaw = document.getElementById('dtypes').value.split(',').map(s=>s.trim()).filter(s=>s);
   const parseDatesRaw = document.getElementById('parse_dates').value.split(',').map(s=>s.trim()).filter(s=>s);
-  
   const fillna = document.getElementById('fillna').value;
   const flagCols = document.getElementById('flag_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
   const catCols = document.getElementById('cat_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
   const featCode = document.getElementById('feat_code').value.trim();
-  
-  const plotCorr = document.getElementById('plot_corr').checked;
-  const plotTarget = document.getElementById('plot_target').checked;
-
   const target = document.getElementById('target').value || 'target';
   const featsStr = document.getElementById('feats').value.trim();
   const mlTask = document.getElementById('ml_task').value;
   const mlAlgo = document.getElementById('ml_algo').value;
 
-  // pandasオプション構築
   let usecolsStr = usecolsRaw.length > 0 ? `, usecols=${JSON.stringify(usecolsRaw)}` : '';
   let dtypeStr = '';
   if (dtypesRaw.length > 0) {
@@ -154,126 +203,57 @@ document.getElementById('generateBtn').addEventListener('click', function() {
   }
   let parseDatesStr = parseDatesRaw.length > 0 ? `, parse_dates=${JSON.stringify(parseDatesRaw)}` : '';
 
-  // --- セル1: 環境構築と読込 ---
-  let cell1 = `# 【セル1】環境構築とデータ読み込み (Version: ${version} / ${author})\n`;
-  if (useColab) {
-    cell1 += `!pip install japanize-matplotlib shap lightgbm xgboost scikit-learn -q\nimport japanize_matplotlib\n`;
-  }
-  cell1 += `import pandas as pd\nimport numpy as np\nimport seaborn as sns\nimport matplotlib.pyplot as plt\nimport shap\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\nimport datetime\n\n`;
-  
-  // アルゴリズム別のインポート
+  let cell1 = `# 【フェーズ2: セル1】本番データ読み込み (指定したカラム・型のみ)\n!pip install japanize-matplotlib shap lightgbm scikit-learn -q\nimport japanize_matplotlib\nimport pandas as pd\nimport numpy as np\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nimport shap\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\nimport datetime\n`;
   if (mlAlgo === 'lgb') cell1 += `import lightgbm as lgb\n`;
-  else if (mlAlgo === 'rf') cell1 += `from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier\n`;
-  else if (mlAlgo === 'xgb') cell1 += `import xgboost as xgb\n`;
-  else if (mlAlgo === 'lr') {
-    if (mlTask === 'reg') cell1 += `from sklearn.linear_model import LinearRegression\n`;
-    else cell1 += `from sklearn.linear_model import LogisticRegression\n`;
-  } else if (mlAlgo === 'dt') {
-    if (mlTask === 'reg') cell1 += `from sklearn.tree import DecisionTreeRegressor\nfrom sklearn import tree\n`;
-    else cell1 += `from sklearn.tree import DecisionTreeClassifier\nfrom sklearn import tree\n`;
-  }
+  else if (mlAlgo === 'lr' && mlTask === 'reg') cell1 += `from sklearn.linear_model import LinearRegression\n`;
+  else if (mlAlgo === 'lr' && mlTask === 'clf') cell1 += `from sklearn.linear_model import LogisticRegression\n`;
+  else if (mlAlgo === 'dt' && mlTask === 'reg') cell1 += `from sklearn.tree import DecisionTreeRegressor\nfrom sklearn import tree\n`;
+  else if (mlAlgo === 'dt' && mlTask === 'clf') cell1 += `from sklearn.tree import DecisionTreeClassifier\nfrom sklearn import tree\n`;
 
-  cell1 += `\n# データの読み込み\n`;
-  if (filetype === 'csv') cell1 += `df = pd.read_csv('${filepath}', encoding='${encoding}'${usecolsStr}${dtypeStr}${parseDatesStr})\n`;
-  else cell1 += `df = pd.read_excel('${filepath}'${usecolsStr}${dtypeStr}${parseDatesStr})\n`;
-  cell1 += `\ndf.head(3)`;
+  if (info.filetype === 'csv') cell1 += `\ndf = pd.read_csv('${info.filepath}', encoding='${info.encoding}'${usecolsStr}${dtypeStr}${parseDatesStr})\n`;
+  else cell1 += `\ndf = pd.read_excel('${info.filepath}'${usecolsStr}${dtypeStr}${parseDatesStr})\n`;
+  cell1 += `print("読込完了: ", df.shape)\n`;
 
-  // --- セル2: 前処理と特徴量エンジニアリング ---
-  let cell2 = `# 【セル2】前処理と特徴量エンジニアリング\n# 文字列のベクトル化正規化\nfor col in df.select_dtypes(include=['object']).columns:\n    df[col] = df[col].astype(str).str.normalize('NFKC').str.strip()\n\n`;
-  
+  let cell2 = `# 【フェーズ2: セル2】前処理と特徴量エンジニアリング\n# 文字列正規化\nfor col in df.select_dtypes(include=['object']).columns:\n    df[col] = df[col].astype(str).str.normalize('NFKC').str.strip()\n\n`;
   if (fillna === 'dropna') cell2 += `# 欠損値処理\ndf = df.dropna()\n`;
   else cell2 += `# 欠損値処理\nfor col in df.columns:\n    if df[col].isnull().any():\n        fill_val = df[col].${fillna}() if df[col].dtype in ['int64', 'float64'] else df[col].mode()[0]\n        df[col] = df[col].fillna(fill_val)\n`;
   
-  if (flagCols.length > 0) cell2 += `\n# フラグ変数の数値化\nfor col in ${JSON.stringify(flagCols)}:\n    if col in df.columns:\n        u_vals = df[col].dropna().unique()\n        if len(u_vals) == 2:\n            df[col] = df[col].map({u_vals[0]: 0, u_vals[1]: 1})\n`;
-  
+  if (flagCols.length > 0) cell2 += `\n# フラグ数値化\nfor col in ${JSON.stringify(flagCols)}:\n    if col in df.columns:\n        u_vals = df[col].dropna().unique()\n        if len(u_vals) == 2:\n            df[col] = df[col].map({u_vals[0]: 0, u_vals[1]: 1})\n`;
   if (catCols.length > 0) cell2 += `\n# One-Hot Encoding\ndf = pd.get_dummies(df, columns=[c for c in ${JSON.stringify(catCols)} if c in df.columns], drop_first=True)\n`;
-  
-  if (featCode) {
-    cell2 += `\n# 特徴量エンジニアリング (ユーザー定義)\n${featCode}\n`;
-  }
-  cell2 += `\nprint("前処理完了: 現在のデータサイズ", df.shape)`;
+  if (featCode) cell2 += `\n# 新規特徴量作成\n${featCode}\n`;
+  cell2 += `\n# 多重共線性チェック (相関行列)\nplt.figure(figsize=(10, 8))\nsns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm')\nplt.title('本番データの相関行列')\nplt.show()\n`;
 
-  // --- セル3: EDA・グラフ設定 ---
-  let cell3 = `# 【セル3】探索的データ分析 (EDA)・グラフ化\ntarget = '${target}'\n\n`;
-  if (!plotCorr && !plotTarget) {
-    cell3 += `# ※グラフ表示設定がオフのためスキップ\nprint("グラフ出力なし")\n`;
-  } else {
-    if (plotCorr) {
-      cell3 += `# 相関行列ヒートマップ\nplt.figure(figsize=(10, 8))\nsns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm', annot=False)\nplt.title('Correlation Heatmap')\nplt.show()\n\n`;
-    }
-    if (plotTarget) {
-      cell3 += `# 目的変数と各特徴量の関係\nnum_cols = [c for c in df.select_dtypes(include=np.number).columns if c != target]\nfor col in num_cols[:5]:  # 表示領域の都合上、最初の5つのみ描画\n    plt.figure(figsize=(6, 4))\n`;
-      if (mlTask === 'reg') {
-        cell3 += `    sns.scatterplot(data=df, x=col, y=target)\n    plt.title(f"{col} vs {target}")\n`;
-      } else {
-        cell3 += `    sns.boxplot(data=df, x=target, y=col)\n    plt.title(f"{target} ごとの {col} の分布")\n`;
-      }
-      cell3 += `    plt.show()\n`;
-    }
-  }
-
-  // --- セル4: モデリング ---
-  let cell4 = `# 【セル4】モデリングとビジネスインパクト評価\n`;
-  if (featsStr) cell4 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
-  else cell4 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
+  let cell3 = `# 【フェーズ2: セル3】モデリングと評価\ntarget = '${target}'\n`;
+  if (featsStr) cell3 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
+  else cell3 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
   
-  cell4 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
+  cell3 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
 
   let modelInst = '';
   if (mlTask === 'reg') {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMRegressor(random_state=42)';
-    else if (mlAlgo === 'rf') modelInst = 'RandomForestRegressor(random_state=42)';
-    else if (mlAlgo === 'xgb') modelInst = 'xgb.XGBRegressor(random_state=42)';
     else if (mlAlgo === 'lr') modelInst = 'LinearRegression()';
     else if (mlAlgo === 'dt') modelInst = 'DecisionTreeRegressor(max_depth=4, random_state=42)';
-    
-    cell4 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\nprint(f"予測誤差による推定リスク額: {metric_val * 1000:,.0f} 円 (※単価換算)")\n`;
+    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\n`;
   } else {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMClassifier(random_state=42)';
-    else if (mlAlgo === 'rf') modelInst = 'RandomForestClassifier(random_state=42)';
-    else if (mlAlgo === 'xgb') modelInst = 'xgb.XGBClassifier(random_state=42)';
     else if (mlAlgo === 'lr') modelInst = 'LogisticRegression(random_state=42, max_iter=1000)';
     else if (mlAlgo === 'dt') modelInst = 'DecisionTreeClassifier(max_depth=4, random_state=42)';
-
-    cell4 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
+    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
   }
-  
-  if (mlAlgo === 'dt') {
-    cell4 += `\n# 決定木の可視化\nplt.figure(figsize=(15, 10))\ntree.plot_tree(model, feature_names=features, filled=True, rounded=True, max_depth=3)\nplt.show()\n`;
-  }
+  if (mlAlgo === 'dt') cell3 += `\n# 決定木の描画\nplt.figure(figsize=(15, 10))\ntree.plot_tree(model, feature_names=features, filled=True, rounded=True, max_depth=3)\nplt.show()\n`;
 
-  // --- セル5: SHAPとログ ---
-  let cell5 = `# 【セル5】要因特定とログ保存\n`;
-  
-  // アルゴリズムに応じたSHAP処理
-  if (mlAlgo === 'lr') {
-    cell5 += `explainer = shap.LinearExplainer(model, X_train)\nshap_values = explainer.shap_values(X_test)\n`;
-  } else if (mlAlgo === 'dt' || mlAlgo === 'rf' || mlAlgo === 'xgb' || mlAlgo === 'lgb') {
-    cell5 += `explainer = shap.TreeExplainer(model)\nshap_values = explainer.shap_values(X_test)\n`;
-  }
-  
-  cell5 += `plt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_filename = f"analysis_log_${version}.txt"\nlog_content = f"""======================================\\n分析ログ (Version: ${version})\\n======================================\\n実行日時: {run_time}\\n分析者: ${author}\\n目的変数: {target}\\n\\n[評価指標]\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n======================================"""\n\nwith open(log_filename, 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint(f"\\n※分析の証跡を '{log_filename}' に保存しました。")\n`;
+  let cell4 = `# 【フェーズ2: セル4】SHAP要因分析とログ保存\n`;
+  if (mlAlgo === 'lr') cell4 += `explainer = shap.LinearExplainer(model, X_train)\n`;
+  else cell4 += `explainer = shap.TreeExplainer(model)\n`;
+  cell4 += `shap_values = explainer.shap_values(X_test)\nplt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_content = f"ログ (Version: ${info.version})\\n分析者: ${info.author}\\n目的変数: {target}\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n"\nwith open("analysis_log.txt", 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint("証跡を保存しました。")\n`;
 
-  const outputPanel = document.getElementById('outputPanel');
-  outputPanel.innerHTML = '';
-
-  const cells = [
-    { title: 'セル 1/5: 環境構築と読込', code: cell1 },
-    { title: 'セル 2/5: 前処理と特徴量エンジニアリング', code: cell2 },
-    { title: 'セル 3/5: EDA・グラフ作成', code: cell3 },
-    { title: 'セル 4/5: モデリングと評価', code: cell4 },
-    { title: 'セル 5/5: 要因分析(SHAP)とログ保存', code: cell5 }
-  ];
-
-  cells.forEach(c => {
-    const container = document.createElement('div');
-    container.className = 'cell-container';
-    container.innerHTML = `
-      <div class="cell-header">${c.title}</div>
-      <pre class="cell-code">${c.code}</pre>
-    `;
-    outputPanel.appendChild(container);
-  });
+  renderCells([
+    { title: '🚀 セル 1/4: 本番読込 (絞り込み・型指定後)', code: cell1 },
+    { title: '🚀 セル 2/4: 前処理と共線性チェック', code: cell2 },
+    { title: '🚀 セル 3/4: モデリングと評価', code: cell3 },
+    { title: '🚀 セル 4/4: 要因特定とログ保存', code: cell4 }
+  ]);
 });
 </script>
 </body>
