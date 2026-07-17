@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>分析コード調書ジェネレーター | マスター版</title>
+<title>分析コード調書ジェネレーター | セル分割対応版</title>
 <style>
-  :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; --border: #ccc; }
+  :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; --border: #ccc; --colab-bg: #f8f9fa; }
   body { background: var(--paper); color: var(--ink); font-family: sans-serif; padding: 20px; font-size: 13px; }
-  main { max-width: 1300px; margin: auto; display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
+  main { max-width: 1400px; margin: auto; display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
   .panel { background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
   .step { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px; }
   .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
@@ -15,10 +15,14 @@
   input[type="text"], select { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
   .checkbox-label { display: flex; align-items: center; font-weight: normal; font-size: 12px; cursor: pointer; }
   .checkbox-label input { width: auto; margin-right: 5px; }
-  button { background: var(--navy); color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; }
-  button:hover { background: #1a2a52; }
-  #codeBox { background: #1e1e1e; color: #dcdcdc; padding: 20px; border-radius: 6px; white-space: pre-wrap; overflow-y: auto; height: 85vh; font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.5; }
+  button.generate { background: var(--navy); color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; }
+  button.generate:hover { background: #1a2a52; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  
+  /* セル出力用スタイル */
+  .cell-container { margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+  .cell-header { background: #eaeaea; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+  .cell-code { background: var(--colab-bg); padding: 15px; margin: 0; font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; color: #333; }
 </style>
 </head>
 <body>
@@ -29,18 +33,10 @@
     <div class="step">
       <h2>00. 環境・バージョン</h2>
       <div class="grid-2">
-        <div>
-          <label>バージョン</label>
-          <input type="text" id="version" value="v1.0.0">
-        </div>
-        <div>
-          <label>分析者名</label>
-          <input type="text" id="author" value="Suzuki Shinya">
-        </div>
+        <div><label>バージョン</label><input type="text" id="version" value="v1.0.0"></div>
+        <div><label>分析者名</label><input type="text" id="author" value="Suzuki Shinya"></div>
       </div>
-      <label class="checkbox-label">
-        <input type="checkbox" id="use_colab" checked> Google Colab用セットアップ (日本語化・ライブラリインストール)を含む
-      </label>
+      <label class="checkbox-label"><input type="checkbox" id="use_colab" checked> Google Colab用セットアップを含む</label>
     </div>
 
     <div class="step">
@@ -103,19 +99,19 @@
         <div>
           <label>アルゴリズム</label>
           <select id="ml_algo">
-            <option value="lgb">LightGBM (高速・高精度)</option>
-            <option value="rf">Random Forest (安定)</option>
-            <option value="xgb">XGBoost (Kaggle標準)</option>
+            <option value="lgb">LightGBM</option>
+            <option value="rf">Random Forest</option>
+            <option value="xgb">XGBoost</option>
           </select>
         </div>
       </div>
     </div>
 
-    <button id="generateBtn">🚀 スペシャリストコードを生成</button>
+    <button class="generate" id="generateBtn">🚀 Colab用セル分割コードを生成</button>
   </div>
   
-  <div class="panel" style="padding: 0; background: #1e1e1e;">
-    <div id="codeBox"># 左側の設定を入力し、「スペシャリストコードを生成」をクリックしてください。</div>
+  <div class="panel" id="outputPanel" style="background: #fff; padding: 20px;">
+    <p style="color: #666; text-align: center; margin-top: 50px;">左側の設定を入力し、「生成」をクリックすると<br>Colabのセル単位に分割されたコードが出力されます。</p>
   </div>
 </main>
 
@@ -138,203 +134,82 @@ document.getElementById('generateBtn').addEventListener('click', function() {
   const mlTask = document.getElementById('ml_task').value;
   const mlAlgo = document.getElementById('ml_algo').value;
 
-  let code = `# ==========================================
-# 分析コード調書 (Version: ${version})
-# 分析者: ${author}
-# ==========================================\n`;
-
-  if (useColab) {
-    code += `
-# ------------------------------------------
-# 00. 環境構築 (Google Colab / 日本語化対応)
-# ------------------------------------------
-!pip install japanize-matplotlib shap lightgbm xgboost scikit-learn -q
-import japanize_matplotlib
-`;
-  }
-
-  code += `
-import pandas as pd
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-import shap
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, accuracy_score
-import datetime
-`;
-
-  if (mlAlgo === 'lgb') code += `import lightgbm as lgb\n`;
-  else if (mlAlgo === 'rf') code += `from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier\n`;
-  else if (mlAlgo === 'xgb') code += `import xgboost as xgb\n`;
-
   let dtypeStr = zeroCols.length > 0 ? `, dtype={c: str for c in ${JSON.stringify(zeroCols)}}` : '';
 
-  code += `
-# ------------------------------------------
-# 01. データ読み込みと正規化
-# ------------------------------------------
-`;
-  if (filetype === 'csv') {
-    code += `df = pd.read_csv('${filepath}', encoding='${encoding}'${dtypeStr})\n`;
-  } else {
-    code += `df = pd.read_excel('${filepath}'${dtypeStr})\n`;
+  // --- セル1: 環境構築と読込 ---
+  let cell1 = `# 【セル1】環境構築とデータ読み込み (Version: ${version} / ${author})\n`;
+  if (useColab) {
+    cell1 += `!pip install japanize-matplotlib shap lightgbm xgboost scikit-learn -q\nimport japanize_matplotlib\n`;
   }
+  cell1 += `import pandas as pd\nimport numpy as np\nimport seaborn as sns\nimport matplotlib.pyplot as plt\nimport shap\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\nimport datetime\n\n`;
+  
+  if (mlAlgo === 'lgb') cell1 += `import lightgbm as lgb\n`;
+  else if (mlAlgo === 'rf') cell1 += `from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier\n`;
+  else if (mlAlgo === 'xgb') cell1 += `import xgboost as xgb\n`;
 
-  code += `
-# 文字列の全角・半角・スペースブレをベクトル化処理で正規化
-for col in df.select_dtypes(include=['object']).columns:
-    df[col] = df[col].astype(str).str.normalize('NFKC').str.strip()
+  cell1 += `\n# データの読み込み\n`;
+  if (filetype === 'csv') cell1 += `df = pd.read_csv('${filepath}', encoding='${encoding}'${dtypeStr})\n`;
+  else cell1 += `df = pd.read_excel('${filepath}'${dtypeStr})\n`;
+  cell1 += `\ndf.head(3)`;
 
-# ------------------------------------------
-# 02. 前処理・データクレンジング
-# ------------------------------------------
-# 欠損値の分布確認
-plt.figure(figsize=(10, 4))
-sns.heatmap(df.isnull(), cbar=False, cmap='viridis')
-plt.title('欠損値の分布状況')
-plt.show()
+  // --- セル2: 前処理と特徴量エンジニアリング ---
+  let cell2 = `# 【セル2】前処理と特徴量エンジニアリング\n# 文字列のベクトル化正規化\nfor col in df.select_dtypes(include=['object']).columns:\n    df[col] = df[col].astype(str).str.normalize('NFKC').str.strip()\n\n`;
+  
+  if (fillna === 'dropna') cell2 += `# 欠損値処理\ndf = df.dropna()\n`;
+  else cell2 += `# 欠損値処理\nfor col in df.columns:\n    if df[col].isnull().any():\n        fill_val = df[col].${fillna}() if df[col].dtype in ['int64', 'float64'] else df[col].mode()[0]\n        df[col] = df[col].fillna(fill_val)\n`;
+  
+  if (flagCols.length > 0) cell2 += `\n# フラグ変数の数値化\nfor col in ${JSON.stringify(flagCols)}:\n    if col in df.columns:\n        u_vals = df[col].dropna().unique()\n        if len(u_vals) == 2:\n            df[col] = df[col].map({u_vals[0]: 0, u_vals[1]: 1})\n`;
+  
+  if (catCols.length > 0) cell2 += `\n# One-Hot Encoding\ndf = pd.get_dummies(df, columns=[c for c in ${JSON.stringify(catCols)} if c in df.columns], drop_first=True)\n`;
+  
+  if (featName && featCalc) cell2 += `\n# 新規特徴量作成\ndf['${featName}'] = ${featCalc}\n`;
+  
+  cell2 += `\n# 多重共線性の確認\nplt.figure(figsize=(10, 8))\nsns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm')\nplt.title('Correlation Heatmap')\nplt.show()`;
 
-# 欠損値の補完 (${fillna})
-`;
+  // --- セル3: モデリング ---
+  let cell3 = `# 【セル3】モデリングとビジネスインパクト評価\ntarget = '${target}'\n`;
+  if (featsStr) cell3 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
+  else cell3 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
+  
+  cell3 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
 
-  if (fillna === 'dropna') {
-    code += `df = df.dropna()\n`;
-  } else {
-    code += `for col in df.columns:
-    if df[col].isnull().any():
-        if df[col].dtype in ['int64', 'float64']:
-            fill_val = df[col].${fillna}()
-        else:
-            fill_val = df[col].mode()[0]
-        df[col] = df[col].fillna(fill_val)\n`;
-  }
-
-  if (flagCols.length > 0) {
-    code += `
-# フラグ変数の数値化 (0-1変換)
-flag_cols = ${JSON.stringify(flagCols)}
-for col in flag_cols:
-    if col in df.columns:
-        unique_vals = df[col].dropna().unique()
-        if len(unique_vals) == 2:
-            mapping = {unique_vals[0]: 0, unique_vals[1]: 1}
-            df[col] = df[col].map(mapping)
-`;
-  }
-
-  if (catCols.length > 0) {
-    code += `
-# One-Hot Encoding (多重共線性回避のためdrop_first=True)
-cat_cols = ${JSON.stringify(catCols)}
-df = pd.get_dummies(df, columns=[c for c in cat_cols if c in df.columns], drop_first=True)
-`;
-  }
-
-  if (featName && featCalc) {
-    code += `
-# 特徴量エンジニアリング
-df['${featName}'] = ${featCalc}
-`;
-  }
-
-  code += `
-# ------------------------------------------
-# 03. 質的診断 (多重共線性の確認)
-# ------------------------------------------
-plt.figure(figsize=(12, 10))
-sns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm', annot=False)
-plt.title('多重共線性チェック (相関行列ヒートマップ)')
-plt.show()
-
-# ------------------------------------------
-# 04. モデリングとビジネスインパクト評価
-# ------------------------------------------
-target = '${target}'
-`;
-  if (featsStr) {
-    code += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
-  } else {
-    code += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
-  }
-
-  code += `
-X = df[features]
-y = df[target]
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-
-`;
-
-  // モデルのインスタンス化
   let modelInst = '';
   if (mlTask === 'reg') {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMRegressor(random_state=42)';
     else if (mlAlgo === 'rf') modelInst = 'RandomForestRegressor(random_state=42)';
     else if (mlAlgo === 'xgb') modelInst = 'xgb.XGBRegressor(random_state=42)';
-    
-    code += `model = ${modelInst}.fit(X_train, y_train)
-pred = model.predict(X_test)
-metric_val = mean_absolute_error(y_test, pred)
-baseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))
-metric_name = "MAE"
-
-print("=== 予測精度とビジネスインパクト ===")
-print(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")
-print(f"機械学習モデル MAE: {metric_val:.2f}")
-print(f"予測誤差による推定リスク額: {metric_val * 1000:,.0f} 円 (※単価換算)")
-`;
+    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\nprint(f"予測誤差による推定リスク額: {metric_val * 1000:,.0f} 円 (※単価換算)")\n`;
   } else {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMClassifier(random_state=42)';
     else if (mlAlgo === 'rf') modelInst = 'RandomForestClassifier(random_state=42)';
     else if (mlAlgo === 'xgb') modelInst = 'xgb.XGBClassifier(random_state=42)';
-
-    code += `model = ${modelInst}.fit(X_train, y_train)
-pred = model.predict(X_test)
-metric_val = accuracy_score(y_test, pred)
-baseline_val = y_test.value_counts(normalize=True).max()
-metric_name = "正答率"
-
-print("=== 予測精度とビジネスインパクト ===")
-print(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")
-print(f"機械学習モデル正答率: {metric_val:.1%}")
-`;
+    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
   }
 
-  code += `
-# ------------------------------------------
-# 05. SHAPによる要因特定 (ブラックボックス回避)
-# ------------------------------------------
-explainer = shap.TreeExplainer(model)
-shap_values = explainer.shap_values(X_test)
-plt.figure(figsize=(10, 8))
-shap.summary_plot(shap_values, X_test)
+  // --- セル4: SHAPとログ ---
+  let cell4 = `# 【セル4】SHAP要因特定とログ保存\nexplainer = shap.TreeExplainer(model)\nshap_values = explainer.shap_values(X_test)\nplt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_filename = f"analysis_log_${version}.txt"\nlog_content = f"""======================================\\n分析ログ (Version: ${version})\\n======================================\\n実行日時: {run_time}\\n分析者: ${author}\\n目的変数: {target}\\n\\n[評価指標]\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n======================================"""\n\nwith open(log_filename, 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint(f"\\n※分析の証跡を '{log_filename}' に保存しました。")\n`;
 
-# ------------------------------------------
-# 06. 実行ログの保存 (証跡管理)
-# ------------------------------------------
-run_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-log_filename = f"analysis_log_${version}.txt"
+  const outputPanel = document.getElementById('outputPanel');
+  outputPanel.innerHTML = '';
 
-log_content = f"""======================================
-分析ログ (Version: ${version})
-======================================
-実行日時: {run_time}
-分析者: ${author}
-モデル: ${mlAlgo.toUpperCase()} (${mlTask === 'reg' ? '回帰' : '分類'})
-目的変数: {target}
-特徴量: {features}
+  const cells = [
+    { title: 'セル 1/4: 環境構築と読込', code: cell1 },
+    { title: 'セル 2/4: 前処理と特徴量エンジニアリング', code: cell2 },
+    { title: 'セル 3/4: モデリングと評価', code: cell3 },
+    { title: 'セル 4/4: 要因分析とログ保存', code: cell4 }
+  ];
 
-[評価指標]
-ベースライン {metric_name}: {baseline_val:.4f}
-モデル {metric_name}: {metric_val:.4f}
-======================================"""
-
-with open(log_filename, 'w', encoding='utf-8') as f:
-    f.write(log_content)
-print(f"\\n※分析の証跡を '{log_filename}' に保存しました。")
-`;
-
-  document.getElementById('codeBox').textContent = code;
+  cells.forEach(c => {
+    const container = document.createElement('div');
+    container.className = 'cell-container';
+    container.innerHTML = `
+      <div class="cell-header">
+        <span>${c.title}</span>
+      </div>
+      <pre class="cell-code">${c.code}</pre>
+    `;
+    outputPanel.appendChild(container);
+  });
 });
 </script>
 </body>
