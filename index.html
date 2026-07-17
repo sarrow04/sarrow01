@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>分析コード調書ジェネレーター | スペシャリスト版</title>
+<style>
+  :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; }
+  body { background: var(--paper); color: var(--ink); font-family: sans-serif; padding: 20px; line-height: 1.6; }
+  main { max-width: 1000px; margin: auto; }
+  .step { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+  h2 { color: var(--navy); border-bottom: 2px solid var(--gold); padding-bottom: 5px; }
+  button { background: var(--navy); color: #fff; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; }
+  #codeBox { background: #1e1e1e; color: #dcdcdc; padding: 15px; border-radius: 4px; overflow-x: auto; white-space: pre; font-family: monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🛠️ 分析コード調書ジェネレーター (スペシャリスト版)</h1>
+  <div id="controls">
+    <!-- 各種設定フォーム -->
+    <section class="step">
+      <h2>1. データ読み込みと診断</h2>
+      <input type="text" id="filePath" value="data.csv">
+      <label><input type="checkbox" id="optCorr" checked> 相関ヒートマップを表示</label>
+    </section>
+
+    <section class="step">
+      <h2>2. 目的変数と特徴量</h2>
+      <input type="text" id="target" placeholder="目的変数">
+      <input type="text" id="feats" placeholder="特徴量（カンマ区切り）">
+    </section>
+
+    <section class="step">
+      <h2>3. 統計・機械学習分析</h2>
+      <button id="generateBtn">🚀 専門コードを生成</button>
+    </section>
+  </div>
+
+  <div id="output">
+    <h2>生成された調書</h2>
+    <div id="codeBox"># ここに生成コードが表示されます</div>
+  </div>
+</main>
+
+<script>
+document.getElementById('generateBtn').addEventListener('click', function() {
+  const target = document.getElementById('target').value || 'target';
+  const feats = document.getElementById('feats').value || 'features';
+  
+  const code = `# スペシャリスト分析調書
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import train_test_split
+import shap
+
+df = pd.read_csv('${document.getElementById('filePath').value}')
+
+# 1.5 質的診断：多重共線性チェック
+plt.figure(figsize=(10, 8))
+sns.heatmap(df.select_dtypes(include=np.number).corr(), annot=True, cmap='coolwarm', fmt='.2f')
+plt.title('多重共線性チェック (相関行列)')
+plt.show()
+
+# 2. 機械学習とベースライン比較
+X = df[[${feats.split(',').map(f => "'" + f.trim() + "'").join(', ')}]]
+y = df['${target}']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+# ベースライン (平均値予測)
+baseline_mae = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))
+print(f"ベースライン(平均値予測) MAE: {baseline_mae:.2f}")
+
+# モデル構築
+model = RandomForestRegressor(random_state=42).fit(X_train, y_train)
+pred = model.predict(X_test)
+mae = mean_absolute_error(y_test, pred)
+print(f"モデル MAE: {mae:.2f}")
+
+# 金額換算リスク評価
+unit_price = 1000 
+print(f"予測誤差による推定リスク額: {mae * unit_price:,.0f} 円")
+
+# SHAP要因分析
+explainer = shap.TreeExplainer(model)
+shap.summary_plot(explainer.shap_values(X_test), X_test)
+`;
+  document.getElementById('codeBox').textContent = code;
+});
+</script>
+</body>
+</html>
