@@ -2,26 +2,26 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>分析コード調書ジェネレーター | セル分割対応版</title>
+<title>分析コード調書ジェネレーター | マスター版</title>
 <style>
   :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; --border: #ccc; --colab-bg: #f8f9fa; }
   body { background: var(--paper); color: var(--ink); font-family: sans-serif; padding: 20px; font-size: 13px; }
-  main { max-width: 1400px; margin: auto; display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
+  main { max-width: 1400px; margin: auto; display: grid; grid-template-columns: 420px 1fr; gap: 20px; }
   .panel { background: #fff; padding: 20px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); max-height: 90vh; overflow-y: auto; }
   .step { border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 12px; }
   .step:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
   h2 { font-size: 14px; color: var(--navy); border-left: 4px solid var(--gold); padding-left: 8px; margin-top: 0; }
-  label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px; }
-  input[type="text"], select { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; }
-  .checkbox-label { display: flex; align-items: center; font-weight: normal; font-size: 12px; cursor: pointer; }
+  label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 11px; color: #444; }
+  input[type="text"], select, textarea { width: 100%; padding: 6px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; font-size: 12px; }
+  textarea { resize: vertical; min-height: 60px; font-family: monospace; }
+  .checkbox-label { display: flex; align-items: center; font-weight: normal; font-size: 12px; cursor: pointer; margin-bottom: 5px; }
   .checkbox-label input { width: auto; margin-right: 5px; }
   button.generate { background: var(--navy); color: #fff; border: none; padding: 12px; width: 100%; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; }
   button.generate:hover { background: #1a2a52; }
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   
-  /* セル出力用スタイル */
   .cell-container { margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
-  .cell-header { background: #eaeaea; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+  .cell-header { background: #eaeaea; padding: 8px 12px; font-weight: bold; font-size: 12px; border-bottom: 1px solid #ddd; }
   .cell-code { background: var(--colab-bg); padding: 15px; margin: 0; font-family: 'Courier New', Consolas, monospace; font-size: 13px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap; color: #333; }
 </style>
 </head>
@@ -40,27 +40,25 @@
     </div>
 
     <div class="step">
-      <h2>01. 読込設定</h2>
+      <h2>01. 読込設定 (型・日付対応)</h2>
       <div class="grid-2">
         <div>
           <label>ファイル形式</label>
-          <select id="filetype">
-            <option value="csv">CSV</option>
-            <option value="excel">Excel (.xlsx)</option>
-          </select>
+          <select id="filetype"><option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option></select>
         </div>
         <div>
           <label>エンコーディング</label>
-          <select id="encoding">
-            <option value="utf-8">UTF-8</option>
-            <option value="cp932">Shift-JIS (cp932)</option>
-          </select>
+          <select id="encoding"><option value="utf-8">UTF-8</option><option value="cp932">Shift-JIS (cp932)</option></select>
         </div>
       </div>
       <label>ファイルパス</label>
       <input type="text" id="filepath" value="data.csv">
-      <label>0落ち防止カラム (カンマ区切り)</label>
-      <input type="text" id="zero_cols" placeholder="例: 社員番号, 郵便番号">
+      <label>読み込むカラム (カンマ区切り。空白で全カラム)</label>
+      <input type="text" id="usecols" placeholder="例: 社員番号, 日付, 売上">
+      <label>データ型の指定 (カンマ区切り。0落ち防止はstrを指定)</label>
+      <input type="text" id="dtypes" placeholder="例: 社員番号:str, 売上:float">
+      <label>日付型として読み込むカラム (カンマ区切り)</label>
+      <input type="text" id="parse_dates" placeholder="例: 登録日, 更新日時">
     </div>
 
     <div class="step">
@@ -75,15 +73,18 @@
       <input type="text" id="flag_cols" placeholder="例: 退職フラグ">
       <label>One-Hot Encoding (ダミー変数化)</label>
       <input type="text" id="cat_cols" placeholder="例: 部署名">
-      <label>新規特徴量作成 (演算)</label>
-      <div class="grid-2">
-        <input type="text" id="feat_name" placeholder="新カラム名 (例: 単価)">
-        <input type="text" id="feat_calc" placeholder="式 (例: df['売上']/df['数量'])">
-      </div>
+      <label>新規特徴量作成 (Pandas式を複数行入力可)</label>
+      <textarea id="feat_code" placeholder="df['単価'] = df['売上'] / df['数量']"></textarea>
     </div>
 
     <div class="step">
-      <h2>03. 機械学習設定</h2>
+      <h2>03. グラフ・EDA設定</h2>
+      <label class="checkbox-label"><input type="checkbox" id="plot_corr" checked> 相関行列ヒートマップを表示 (多重共線性チェック)</label>
+      <label class="checkbox-label"><input type="checkbox" id="plot_target"> 目的変数と各特徴量の関係をグラフ化 (散布図/箱ひげ図)</label>
+    </div>
+
+    <div class="step">
+      <h2>04. 機械学習設定</h2>
       <label>目的変数</label>
       <input type="text" id="target" placeholder="例: 売上金額">
       <label>特徴量 (空白で目的変数以外すべて)</label>
@@ -91,23 +92,22 @@
       <div class="grid-2">
         <div>
           <label>タスク</label>
-          <select id="ml_task">
-            <option value="reg">回帰 (数値予測)</option>
-            <option value="clf">分類 (確率予測)</option>
-          </select>
+          <select id="ml_task"><option value="reg">回帰 (数値予測)</option><option value="clf">分類 (確率予測)</option></select>
         </div>
         <div>
           <label>アルゴリズム</label>
           <select id="ml_algo">
-            <option value="lgb">LightGBM</option>
-            <option value="rf">Random Forest</option>
-            <option value="xgb">XGBoost</option>
+            <option value="lr">線形回帰 / ロジスティック回帰 (シンプル)</option>
+            <option value="dt">決定木 (シンプル・解釈容易)</option>
+            <option value="lgb">LightGBM (高速・高精度)</option>
+            <option value="rf">Random Forest (安定)</option>
+            <option value="xgb">XGBoost (Kaggle標準)</option>
           </select>
         </div>
       </div>
     </div>
 
-    <button class="generate" id="generateBtn">🚀 Colab用セル分割コードを生成</button>
+    <button class="generate" id="generateBtn">🚀 セル分割コードを生成</button>
   </div>
   
   <div class="panel" id="outputPanel" style="background: #fff; padding: 20px;">
@@ -123,18 +123,36 @@ document.getElementById('generateBtn').addEventListener('click', function() {
   const filetype = document.getElementById('filetype').value;
   const filepath = document.getElementById('filepath').value;
   const encoding = document.getElementById('encoding').value;
-  const zeroCols = document.getElementById('zero_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
+  
+  const usecolsRaw = document.getElementById('usecols').value.split(',').map(s=>s.trim()).filter(s=>s);
+  const dtypesRaw = document.getElementById('dtypes').value.split(',').map(s=>s.trim()).filter(s=>s);
+  const parseDatesRaw = document.getElementById('parse_dates').value.split(',').map(s=>s.trim()).filter(s=>s);
+  
   const fillna = document.getElementById('fillna').value;
   const flagCols = document.getElementById('flag_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
   const catCols = document.getElementById('cat_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const featName = document.getElementById('feat_name').value.trim();
-  const featCalc = document.getElementById('feat_calc').value.trim();
+  const featCode = document.getElementById('feat_code').value.trim();
+  
+  const plotCorr = document.getElementById('plot_corr').checked;
+  const plotTarget = document.getElementById('plot_target').checked;
+
   const target = document.getElementById('target').value || 'target';
   const featsStr = document.getElementById('feats').value.trim();
   const mlTask = document.getElementById('ml_task').value;
   const mlAlgo = document.getElementById('ml_algo').value;
 
-  let dtypeStr = zeroCols.length > 0 ? `, dtype={c: str for c in ${JSON.stringify(zeroCols)}}` : '';
+  // pandasオプション構築
+  let usecolsStr = usecolsRaw.length > 0 ? `, usecols=${JSON.stringify(usecolsRaw)}` : '';
+  let dtypeStr = '';
+  if (dtypesRaw.length > 0) {
+    let dtypeDict = dtypesRaw.map(pair => {
+      let parts = pair.split(':');
+      if(parts.length === 2) return `"${parts[0].trim()}": "${parts[1].trim()}"`;
+      return '';
+    }).filter(s=>s).join(', ');
+    if(dtypeDict) dtypeStr = `, dtype={${dtypeDict}}`;
+  }
+  let parseDatesStr = parseDatesRaw.length > 0 ? `, parse_dates=${JSON.stringify(parseDatesRaw)}` : '';
 
   // --- セル1: 環境構築と読込 ---
   let cell1 = `# 【セル1】環境構築とデータ読み込み (Version: ${version} / ${author})\n`;
@@ -143,13 +161,21 @@ document.getElementById('generateBtn').addEventListener('click', function() {
   }
   cell1 += `import pandas as pd\nimport numpy as np\nimport seaborn as sns\nimport matplotlib.pyplot as plt\nimport shap\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.metrics import mean_absolute_error, accuracy_score\nimport datetime\n\n`;
   
+  // アルゴリズム別のインポート
   if (mlAlgo === 'lgb') cell1 += `import lightgbm as lgb\n`;
   else if (mlAlgo === 'rf') cell1 += `from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier\n`;
   else if (mlAlgo === 'xgb') cell1 += `import xgboost as xgb\n`;
+  else if (mlAlgo === 'lr') {
+    if (mlTask === 'reg') cell1 += `from sklearn.linear_model import LinearRegression\n`;
+    else cell1 += `from sklearn.linear_model import LogisticRegression\n`;
+  } else if (mlAlgo === 'dt') {
+    if (mlTask === 'reg') cell1 += `from sklearn.tree import DecisionTreeRegressor\nfrom sklearn import tree\n`;
+    else cell1 += `from sklearn.tree import DecisionTreeClassifier\nfrom sklearn import tree\n`;
+  }
 
   cell1 += `\n# データの読み込み\n`;
-  if (filetype === 'csv') cell1 += `df = pd.read_csv('${filepath}', encoding='${encoding}'${dtypeStr})\n`;
-  else cell1 += `df = pd.read_excel('${filepath}'${dtypeStr})\n`;
+  if (filetype === 'csv') cell1 += `df = pd.read_csv('${filepath}', encoding='${encoding}'${usecolsStr}${dtypeStr}${parseDatesStr})\n`;
+  else cell1 += `df = pd.read_excel('${filepath}'${usecolsStr}${dtypeStr}${parseDatesStr})\n`;
   cell1 += `\ndf.head(3)`;
 
   // --- セル2: 前処理と特徴量エンジニアリング ---
@@ -162,50 +188,88 @@ document.getElementById('generateBtn').addEventListener('click', function() {
   
   if (catCols.length > 0) cell2 += `\n# One-Hot Encoding\ndf = pd.get_dummies(df, columns=[c for c in ${JSON.stringify(catCols)} if c in df.columns], drop_first=True)\n`;
   
-  if (featName && featCalc) cell2 += `\n# 新規特徴量作成\ndf['${featName}'] = ${featCalc}\n`;
-  
-  cell2 += `\n# 多重共線性の確認\nplt.figure(figsize=(10, 8))\nsns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm')\nplt.title('Correlation Heatmap')\nplt.show()`;
+  if (featCode) {
+    cell2 += `\n# 特徴量エンジニアリング (ユーザー定義)\n${featCode}\n`;
+  }
+  cell2 += `\nprint("前処理完了: 現在のデータサイズ", df.shape)`;
 
-  // --- セル3: モデリング ---
-  let cell3 = `# 【セル3】モデリングとビジネスインパクト評価\ntarget = '${target}'\n`;
-  if (featsStr) cell3 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
-  else cell3 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
+  // --- セル3: EDA・グラフ設定 ---
+  let cell3 = `# 【セル3】探索的データ分析 (EDA)・グラフ化\ntarget = '${target}'\n\n`;
+  if (!plotCorr && !plotTarget) {
+    cell3 += `# ※グラフ表示設定がオフのためスキップ\nprint("グラフ出力なし")\n`;
+  } else {
+    if (plotCorr) {
+      cell3 += `# 相関行列ヒートマップ\nplt.figure(figsize=(10, 8))\nsns.heatmap(df.select_dtypes(include=np.number).corr(), cmap='coolwarm', annot=False)\nplt.title('Correlation Heatmap')\nplt.show()\n\n`;
+    }
+    if (plotTarget) {
+      cell3 += `# 目的変数と各特徴量の関係\nnum_cols = [c for c in df.select_dtypes(include=np.number).columns if c != target]\nfor col in num_cols[:5]:  # 表示領域の都合上、最初の5つのみ描画\n    plt.figure(figsize=(6, 4))\n`;
+      if (mlTask === 'reg') {
+        cell3 += `    sns.scatterplot(data=df, x=col, y=target)\n    plt.title(f"{col} vs {target}")\n`;
+      } else {
+        cell3 += `    sns.boxplot(data=df, x=target, y=col)\n    plt.title(f"{target} ごとの {col} の分布")\n`;
+      }
+      cell3 += `    plt.show()\n`;
+    }
+  }
+
+  // --- セル4: モデリング ---
+  let cell4 = `# 【セル4】モデリングとビジネスインパクト評価\n`;
+  if (featsStr) cell4 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
+  else cell4 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
   
-  cell3 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
+  cell4 += `\nX = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n\n`;
 
   let modelInst = '';
   if (mlTask === 'reg') {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMRegressor(random_state=42)';
     else if (mlAlgo === 'rf') modelInst = 'RandomForestRegressor(random_state=42)';
     else if (mlAlgo === 'xgb') modelInst = 'xgb.XGBRegressor(random_state=42)';
-    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\nprint(f"予測誤差による推定リスク額: {metric_val * 1000:,.0f} 円 (※単価換算)")\n`;
+    else if (mlAlgo === 'lr') modelInst = 'LinearRegression()';
+    else if (mlAlgo === 'dt') modelInst = 'DecisionTreeRegressor(max_depth=4, random_state=42)';
+    
+    cell4 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = mean_absolute_error(y_test, pred)\nbaseline_val = mean_absolute_error(y_test, [y_train.mean()]*len(y_test))\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン MAE (平均値予測): {baseline_val:.2f}")\nprint(f"機械学習モデル MAE: {metric_val:.2f}")\nprint(f"予測誤差による推定リスク額: {metric_val * 1000:,.0f} 円 (※単価換算)")\n`;
   } else {
     if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMClassifier(random_state=42)';
     else if (mlAlgo === 'rf') modelInst = 'RandomForestClassifier(random_state=42)';
     else if (mlAlgo === 'xgb') modelInst = 'xgb.XGBClassifier(random_state=42)';
-    cell3 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
+    else if (mlAlgo === 'lr') modelInst = 'LogisticRegression(random_state=42, max_iter=1000)';
+    else if (mlAlgo === 'dt') modelInst = 'DecisionTreeClassifier(max_depth=4, random_state=42)';
+
+    cell4 += `model = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nmetric_val = accuracy_score(y_test, pred)\nbaseline_val = y_test.value_counts(normalize=True).max()\n\nprint("=== 予測精度とビジネスインパクト ===")\nprint(f"ベースライン正答率 (多数派予測): {baseline_val:.1%}")\nprint(f"機械学習モデル正答率: {metric_val:.1%}")\n`;
+  }
+  
+  if (mlAlgo === 'dt') {
+    cell4 += `\n# 決定木の可視化\nplt.figure(figsize=(15, 10))\ntree.plot_tree(model, feature_names=features, filled=True, rounded=True, max_depth=3)\nplt.show()\n`;
   }
 
-  // --- セル4: SHAPとログ ---
-  let cell4 = `# 【セル4】SHAP要因特定とログ保存\nexplainer = shap.TreeExplainer(model)\nshap_values = explainer.shap_values(X_test)\nplt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_filename = f"analysis_log_${version}.txt"\nlog_content = f"""======================================\\n分析ログ (Version: ${version})\\n======================================\\n実行日時: {run_time}\\n分析者: ${author}\\n目的変数: {target}\\n\\n[評価指標]\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n======================================"""\n\nwith open(log_filename, 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint(f"\\n※分析の証跡を '{log_filename}' に保存しました。")\n`;
+  // --- セル5: SHAPとログ ---
+  let cell5 = `# 【セル5】要因特定とログ保存\n`;
+  
+  // アルゴリズムに応じたSHAP処理
+  if (mlAlgo === 'lr') {
+    cell5 += `explainer = shap.LinearExplainer(model, X_train)\nshap_values = explainer.shap_values(X_test)\n`;
+  } else if (mlAlgo === 'dt' || mlAlgo === 'rf' || mlAlgo === 'xgb' || mlAlgo === 'lgb') {
+    cell5 += `explainer = shap.TreeExplainer(model)\nshap_values = explainer.shap_values(X_test)\n`;
+  }
+  
+  cell5 += `plt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n\nrun_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')\nlog_filename = f"analysis_log_${version}.txt"\nlog_content = f"""======================================\\n分析ログ (Version: ${version})\\n======================================\\n実行日時: {run_time}\\n分析者: ${author}\\n目的変数: {target}\\n\\n[評価指標]\\nベースライン: {baseline_val:.4f}\\nモデル: {metric_val:.4f}\\n======================================"""\n\nwith open(log_filename, 'w', encoding='utf-8') as f:\n    f.write(log_content)\nprint(f"\\n※分析の証跡を '{log_filename}' に保存しました。")\n`;
 
   const outputPanel = document.getElementById('outputPanel');
   outputPanel.innerHTML = '';
 
   const cells = [
-    { title: 'セル 1/4: 環境構築と読込', code: cell1 },
-    { title: 'セル 2/4: 前処理と特徴量エンジニアリング', code: cell2 },
-    { title: 'セル 3/4: モデリングと評価', code: cell3 },
-    { title: 'セル 4/4: 要因分析とログ保存', code: cell4 }
+    { title: 'セル 1/5: 環境構築と読込', code: cell1 },
+    { title: 'セル 2/5: 前処理と特徴量エンジニアリング', code: cell2 },
+    { title: 'セル 3/5: EDA・グラフ作成', code: cell3 },
+    { title: 'セル 4/5: モデリングと評価', code: cell4 },
+    { title: 'セル 5/5: 要因分析(SHAP)とログ保存', code: cell5 }
   ];
 
   cells.forEach(c => {
     const container = document.createElement('div');
     container.className = 'cell-container';
     container.innerHTML = `
-      <div class="cell-header">
-        <span>${c.title}</span>
-      </div>
+      <div class="cell-header">${c.title}</div>
       <pre class="cell-code">${c.code}</pre>
     `;
     outputPanel.appendChild(container);
