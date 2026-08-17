@@ -182,27 +182,21 @@
   .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; }
   .toggle-line label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
 
-  #chartWrap{ display:flex; justify-content:center; padding:6px 0 4px; position:relative; }
-  canvas#chartCanvas{ max-width:100%; height:auto; aspect-ratio:1/1; display:block; }
-
-  .actions{ display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; justify-content:center; }
-  .btn{
-    font-family:'Space Grotesk', sans-serif;
-    font-weight:700;
-    font-size:14px;
-    padding:11px 24px;
-    border:none;
-    border-radius:8px;
-    background:var(--ink);
-    color:var(--bg);
-    cursor:pointer;
-    transition: all 0.2s ease;
+  /* プレビューエリアを正方形に強制 */
+  #chartWrap{ 
+    display:flex; 
+    justify-content:center; 
+    align-items:center;
+    width: 100%;
+    aspect-ratio: 1 / 1; 
+    position:relative; 
+    background-color: var(--surface);
   }
-  .btn:hover{ background:#30392f; transform: translateY(-1px); }
-  .btn.accent{ background:var(--accent); color:#fff; }
-  .btn.accent:hover{ background:#e85a35; }
-  .btn.ghost{ background:none; color:var(--ink); border:1px solid var(--line); }
-  .btn.ghost:hover{ border-color:var(--ink); }
+  canvas#chartCanvas{ 
+    width:100%; 
+    height:100%; 
+    display:block; 
+  }
 
   footer{
     text-align:center;
@@ -218,7 +212,7 @@
 
   <header>
     <h1>ドーナツグラフ ジェネレーター</h1>
-    <div class="tag">構成比を、そのままシェアできる一枚に。</div>
+    <div class="tag">構成比を、直感的に。</div>
   </header>
 
   <div class="grid">
@@ -252,12 +246,6 @@
       <div id="chartWrap">
         <canvas id="chartCanvas" width="560" height="560"></canvas>
       </div>
-      
-      <!-- アクションボタン群 -->
-      <div class="actions">
-        <button class="btn ghost" id="animBtn">▶ アニメーション再生</button>
-        <button class="btn accent" id="downloadBtn">↓ 画像として保存</button>
-      </div>
     </div>
 
   </div>
@@ -283,10 +271,7 @@ var state = {
   showSub: true
 };
 
-var STORE_KEY = "donutReportData_v3";
-var animId = null;
-var animStartTime = null;
-var ANIM_DURATION = 800; // アニメーションの長さ(ミリ秒)
+var STORE_KEY = "donutReportData_v4";
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
@@ -349,7 +334,7 @@ function renderRows(){
       labelInput.value = r.label;
       labelInput.addEventListener('input', function(){
         r.label = labelInput.value;
-        renderAll(false); // 文字入力時はアニメーションさせない
+        renderAll();
       });
 
       var valInput = document.createElement('input');
@@ -359,7 +344,7 @@ function renderRows(){
       valInput.min = 0;
       valInput.addEventListener('input', function(){
         r.value = parseFloat(valInput.value) || 0;
-        renderAll(false);
+        renderAll();
       });
 
       var colorInput = document.createElement('input');
@@ -368,7 +353,7 @@ function renderRows(){
       colorInput.value = r.color || colorForIndex(i);
       colorInput.addEventListener('input', function(){
         r.color = colorInput.value;
-        renderAll(false);
+        renderAll();
       });
 
       var delBtn = document.createElement('button');
@@ -376,7 +361,7 @@ function renderRows(){
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', function(){
         state.rows.splice(i,1);
-        renderAll(true); // 削除時はアニメーションで再描画
+        renderAll();
       });
 
       div.appendChild(idx);
@@ -404,24 +389,21 @@ function renderPaletteRow(){
     btn.innerHTML = dotsHtml + '<span>' + pal.name + '</span>';
     btn.addEventListener('click', function(){
       state.paletteKey = key;
-      // 色変更時は全ての色をリセットしてパレットを適用
       state.rows.forEach(r => r.color = null);
-      renderAll(true); 
+      renderAll(); 
     });
     wrap.appendChild(btn);
   });
 }
 
-// progress (0.0 〜 1.0) でアニメーションの進行度を受け取る
-function paintDonut(ctx, size, opts, progress){
+function paintDonut(ctx, size, opts){
   opts = opts || {};
   var cx = size/2, cy = size/2;
   var outerR = size*0.33;
   var innerR = outerR*0.58;
-  var labelR = outerR*1.16;   // where leader lines terminate
-  var lineR  = outerR*1.03;   // where leader lines start
+  var labelR = outerR*1.16;
+  var lineR  = outerR*1.03;
 
-  // 画像として保存した際に見やすくするため、白背景で塗りつぶす
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, size, size);
 
@@ -447,8 +429,7 @@ function paintDonut(ctx, size, opts, progress){
   state.rows.forEach(function(r, i){
     if(r.value <= 0) return;
     var frac = r.value/total;
-    // 進行度に応じて角度を計算
-    var angle = (frac * Math.PI*2) * progress;
+    var angle = frac * Math.PI*2;
     var a0 = startAngle + gap/2;
     var a1 = startAngle + angle - gap/2;
     if(a1 < a0) a1 = a0;
@@ -461,130 +442,122 @@ function paintDonut(ctx, size, opts, progress){
     ctx.fillStyle = color;
     ctx.fill();
 
-    // ラベル表示用に最終的な中央角度などを保存
-    var fullAngle = frac * Math.PI*2;
-    var finalA0 = startAngle + gap/2;
-    var finalA1 = startAngle + fullAngle - gap/2;
-    segs.push({ r:r, a0:finalA0, a1:finalA1, frac:frac, color:color, mid:(finalA0+finalA1)/2 });
-    
-    startAngle += fullAngle; // 次の開始位置は全体の角度を足す
+    segs.push({ r:r, a0:a0, a1:a1, frac:frac, color:color, mid:(a0+a1)/2 });
+    startAngle += angle;
   });
 
-  // ラベルやテキストはアニメーションが完了（1.0）した時のみ描画する
-  if (progress >= 1.0) {
-    var bigThreshold = 0.15;
-    var smallSegs = [];
+  var bigThreshold = 0.15;
+  var smallSegs = [];
 
-    segs.forEach(function(seg){
-      var mid = seg.mid;
-      if(seg.frac >= bigThreshold){
-        var mr = (outerR+innerR)/2;
-        var lx = cx + Math.cos(mid)*mr;
-        var ly = cy + Math.sin(mid)*mr;
-        ctx.save();
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.lineJoin = "round";
-        var nameSize = size*0.021;
-        var pctSize = size*0.03;
-        var outline = Math.max(2, size*0.005);
-        function strokedFill(txt, x, y){
-          ctx.strokeStyle = "rgba(255,255,255,0.8)";
-          ctx.lineWidth = outline;
-          ctx.strokeText(txt, x, y);
-          ctx.fillStyle = "#1c2620";
-          ctx.fillText(txt, x, y);
-        }
-        if(opts.showLabel && opts.showPercent){
-          ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
-          strokedFill(seg.r.label || '無題', lx, ly-pctSize*0.6);
-          ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
-          strokedFill(Math.round(seg.frac*100)+"%", lx, ly+pctSize*0.5);
-        } else if(opts.showPercent){
-          ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
-          strokedFill(Math.round(seg.frac*100)+"%", lx, ly);
-        } else if(opts.showLabel){
-          ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
-          strokedFill(seg.r.label || '無題', lx, ly);
-        }
-        ctx.restore();
-      } else if(opts.showLabel || opts.showPercent){
-        smallSegs.push(seg);
-      }
-    });
-
-    var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return a.mid-b.mid; });
-    var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return a.mid-b.mid; });
-
-    function placeLeaderLabels(list, side){
-      var n = list.length;
-      if(n===0) return;
-      var topY = cy - outerR*0.86;
-      var botY = cy + outerR*0.86;
-      var stepY = n>1 ? (botY-topY)/(n-1) : 0;
-      list.forEach(function(seg, i){
-        var startX = cx + Math.cos(seg.mid)*lineR;
-        var startY = cy + Math.sin(seg.mid)*lineR;
-        var targetY = n>1 ? topY + stepY*i : cy + Math.sin(seg.mid)*labelR;
-        var elbowX = cx + Math.cos(seg.mid)*labelR;
-        var endX = side==='right' ? size*0.965 : size*0.035;
-
-        ctx.save();
-        ctx.strokeStyle = seg.color;
-        ctx.lineWidth = Math.max(1.5, size*0.0022);
-        ctx.beginPath();
-        ctx.moveTo(startX,startY);
-        ctx.lineTo(elbowX, targetY);
-        ctx.lineTo(endX, targetY);
-        ctx.stroke();
-
-        ctx.fillStyle = seg.color;
-        ctx.beginPath();
-        ctx.arc(startX,startY, size*0.007, 0, Math.PI*2);
-        ctx.fill();
-
-        var namePart = opts.showLabel ? (seg.r.label || '無題') : "";
-        var pctPart = opts.showPercent ? Math.round(seg.frac*100)+"%" : "";
-
-        ctx.textBaseline = "middle";
-        ctx.textAlign = side==='right' ? 'right' : 'left';
-        var textX = side==='right' ? endX-size*0.012 : endX+size*0.012;
-
-        if(namePart && pctPart){
-          ctx.font = "700 "+(size*0.024)+"px 'Space Grotesk', sans-serif";
-          ctx.fillStyle = seg.color;
-          ctx.fillText(pctPart, textX, targetY - size*0.013);
-          ctx.font = "500 "+(size*0.018)+"px 'JetBrains Mono', monospace";
-          ctx.fillStyle = "#1c2620";
-          ctx.fillText(namePart, textX, targetY + size*0.014);
-        } else {
-          ctx.font = "700 "+(size*0.024)+"px 'Space Grotesk', sans-serif";
-          ctx.fillStyle = pctPart ? seg.color : "#1c2620";
-          ctx.fillText(pctPart || namePart, textX, targetY);
-        }
-        ctx.restore();
-      });
-    }
-    placeLeaderLabels(leftList, 'left');
-    placeLeaderLabels(rightList, 'right');
-
-    if(opts.showSub){
+  segs.forEach(function(seg){
+    var mid = seg.mid;
+    if(seg.frac >= bigThreshold){
+      var mr = (outerR+innerR)/2;
+      var lx = cx + Math.cos(mid)*mr;
+      var ly = cy + Math.sin(mid)*mr;
       ctx.save();
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#1c2620";
-      var title = state.title || "";
-      if(title){
-        var titleSize = size*0.033;
-        ctx.font = "700 "+titleSize+"px 'Space Grotesk', sans-serif";
-        wrapCenterText(ctx, title, cx, cy - size*0.012, innerR*1.7, titleSize*1.15);
+      ctx.lineJoin = "round";
+      var nameSize = size*0.021;
+      var pctSize = size*0.03;
+      var outline = Math.max(2, size*0.005);
+      function strokedFill(txt, x, y){
+        ctx.strokeStyle = "rgba(255,255,255,0.8)";
+        ctx.lineWidth = outline;
+        ctx.strokeText(txt, x, y);
+        ctx.fillStyle = "#1c2620";
+        ctx.fillText(txt, x, y);
       }
-      ctx.fillStyle = "#6f7a70";
-      ctx.font = (size*0.017)+"px 'JetBrains Mono', monospace";
-      var subY = title ? cy + size*0.035 : cy;
-      ctx.fillText("n = "+total.toLocaleString('ja-JP'), cx, subY);
+      if(opts.showLabel && opts.showPercent){
+        ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
+        strokedFill(seg.r.label || '無題', lx, ly-pctSize*0.6);
+        ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
+        strokedFill(Math.round(seg.frac*100)+"%", lx, ly+pctSize*0.5);
+      } else if(opts.showPercent){
+        ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
+        strokedFill(Math.round(seg.frac*100)+"%", lx, ly);
+      } else if(opts.showLabel){
+        ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
+        strokedFill(seg.r.label || '無題', lx, ly);
+      }
       ctx.restore();
+    } else if(opts.showLabel || opts.showPercent){
+      smallSegs.push(seg);
     }
+  });
+
+  var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return a.mid-b.mid; });
+  var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return a.mid-b.mid; });
+
+  function placeLeaderLabels(list, side){
+    var n = list.length;
+    if(n===0) return;
+    var topY = cy - outerR*0.86;
+    var botY = cy + outerR*0.86;
+    var stepY = n>1 ? (botY-topY)/(n-1) : 0;
+    list.forEach(function(seg, i){
+      var startX = cx + Math.cos(seg.mid)*lineR;
+      var startY = cy + Math.sin(seg.mid)*lineR;
+      var targetY = n>1 ? topY + stepY*i : cy + Math.sin(seg.mid)*labelR;
+      var elbowX = cx + Math.cos(seg.mid)*labelR;
+      var endX = side==='right' ? size*0.965 : size*0.035;
+
+      ctx.save();
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = Math.max(1.5, size*0.0022);
+      ctx.beginPath();
+      ctx.moveTo(startX,startY);
+      ctx.lineTo(elbowX, targetY);
+      ctx.lineTo(endX, targetY);
+      ctx.stroke();
+
+      ctx.fillStyle = seg.color;
+      ctx.beginPath();
+      ctx.arc(startX,startY, size*0.007, 0, Math.PI*2);
+      ctx.fill();
+
+      var namePart = opts.showLabel ? (seg.r.label || '無題') : "";
+      var pctPart = opts.showPercent ? Math.round(seg.frac*100)+"%" : "";
+
+      ctx.textBaseline = "middle";
+      ctx.textAlign = side==='right' ? 'right' : 'left';
+      var textX = side==='right' ? endX-size*0.012 : endX+size*0.012;
+
+      if(namePart && pctPart){
+        ctx.font = "700 "+(size*0.024)+"px 'Space Grotesk', sans-serif";
+        ctx.fillStyle = seg.color;
+        ctx.fillText(pctPart, textX, targetY - size*0.013);
+        ctx.font = "500 "+(size*0.018)+"px 'JetBrains Mono', monospace";
+        ctx.fillStyle = "#1c2620";
+        ctx.fillText(namePart, textX, targetY + size*0.014);
+      } else {
+        ctx.font = "700 "+(size*0.024)+"px 'Space Grotesk', sans-serif";
+        ctx.fillStyle = pctPart ? seg.color : "#1c2620";
+        ctx.fillText(pctPart || namePart, textX, targetY);
+      }
+      ctx.restore();
+    });
+  }
+  placeLeaderLabels(leftList, 'left');
+  placeLeaderLabels(rightList, 'right');
+
+  if(opts.showSub){
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#1c2620";
+    var title = state.title || "";
+    if(title){
+      var titleSize = size*0.033;
+      ctx.font = "700 "+titleSize+"px 'Space Grotesk', sans-serif";
+      wrapCenterText(ctx, title, cx, cy - size*0.012, innerR*1.7, titleSize*1.15);
+    }
+    ctx.fillStyle = "#6f7a70";
+    ctx.font = (size*0.017)+"px 'JetBrains Mono', monospace";
+    var subY = title ? cy + size*0.035 : cy;
+    ctx.fillText("n = "+total.toLocaleString('ja-JP'), cx, subY);
+    ctx.restore();
   }
 }
 
@@ -612,12 +585,7 @@ function wrapCenterText(ctx, text, cx, cy, maxWidth, lineHeight){
   });
 }
 
-function drawDonut(animate){
-  if(animId) {
-    cancelAnimationFrame(animId);
-    animId = null;
-  }
-  
+function drawDonut(){
   var canvas = document.getElementById('chartCanvas');
   var ctx = canvas.getContext('2d');
   var size = 560;
@@ -625,79 +593,43 @@ function drawDonut(animate){
   canvas.width = size * dpr;
   canvas.height = size * dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  
-  if (animate) {
-    animStartTime = performance.now();
-    function frame(now) {
-      var elapsed = now - animStartTime;
-      var p = elapsed / ANIM_DURATION;
-      if (p > 1) p = 1;
-      
-      // イージング (easeOutQuart) で滑らかに減速
-      var easeP = 1 - Math.pow(1 - p, 4);
-      
-      paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub }, easeP);
-      
-      if (p < 1) {
-        animId = requestAnimationFrame(frame);
-      }
-    }
-    animId = requestAnimationFrame(frame);
-  } else {
-    // アニメーションなしですぐに描画 (1.0)
-    paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub }, 1.0);
-  }
+  paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
 }
 
-function renderAll(animate = false){
+function renderAll(){
   renderRows();
   renderPaletteRow();
-  drawDonut(animate);
+  drawDonut();
   saveState();
 }
 
-// ボタンイベント
-document.getElementById('downloadBtn').addEventListener('click', function(){
-  // ダウンロード時はアニメーション完了状態のキャンバスを保存する
-  drawDonut(false); 
-  var canvas = document.getElementById('chartCanvas');
-  var link = document.createElement('a');
-  link.download = (state.title || 'donut-chart') + '.png';
-  link.href = canvas.toDataURL('image/png');
-  link.click();
-});
-
-document.getElementById('animBtn').addEventListener('click', function(){
-  drawDonut(true); // アニメーションを再再生
-});
-
 document.getElementById('chartTitle').addEventListener('input', function(e){
   state.title = e.target.value;
-  renderAll(false);
+  renderAll();
 });
 
 document.getElementById('addRowBtn').addEventListener('click', function(){
   state.rows.push({ id: uid(), label:"", value:0, color:null });
-  renderAll(true);
+  renderAll();
 });
 
 document.getElementById('showLabelChk').addEventListener('change', function(e){
   state.showLabel = e.target.checked;
-  renderAll(false);
+  renderAll();
 });
 document.getElementById('showPercentChk').addEventListener('change', function(e){
   state.showPercent = e.target.checked;
-  renderAll(false);
+  renderAll();
 });
 document.getElementById('showSubChk').addEventListener('change', function(e){
   state.showSub = e.target.checked;
-  renderAll(false);
+  renderAll();
 });
 
-// 初期化（初回ロード時にアニメーション実行）
+// 初期化
 loadState();
 document.getElementById('chartTitle').value = state.title;
-renderAll(true);
+renderAll();
 </script>
 </body>
 </html>
