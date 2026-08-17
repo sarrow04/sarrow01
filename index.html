@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>グラフジェネレーター2</title>
+<title>ドーナツグラフ ジェネレーター</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
@@ -183,7 +183,7 @@
   .toggle-line label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
 
   #chartWrap{ display:flex; justify-content:center; padding:6px 0 4px; position:relative; }
-  canvas#chartCanvas{ max-width:100%; }
+  canvas#chartCanvas{ max-width:100%; height:auto; aspect-ratio:1/1; display:block; }
 
   .actions{ display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
   .btn{
