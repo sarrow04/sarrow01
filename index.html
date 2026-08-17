@@ -185,19 +185,20 @@
   #chartWrap{ display:flex; justify-content:center; padding:6px 0 4px; position:relative; }
   canvas#chartCanvas{ max-width:100%; height:auto; aspect-ratio:1/1; display:block; }
 
-  .actions{ display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+  .actions{ display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; justify-content:center; }
   .btn{
     font-family:'Space Grotesk', sans-serif;
     font-weight:700;
-    font-size:12px;
-    padding:11px 18px;
+    font-size:14px;
+    padding:11px 24px;
     border:none;
     border-radius:8px;
     background:var(--ink);
     color:var(--bg);
     cursor:pointer;
+    transition: all 0.2s ease;
   }
-  .btn:hover{ background:#30392f; }
+  .btn:hover{ background:#30392f; transform: translateY(-1px); }
   .btn.accent{ background:var(--accent); color:#fff; }
   .btn.accent:hover{ background:#e85a35; }
   .btn.ghost{ background:none; color:var(--ink); border:1px solid var(--line); }
@@ -251,9 +252,11 @@
       <div id="chartWrap">
         <canvas id="chartCanvas" width="560" height="560"></canvas>
       </div>
+      
+      <!-- アクションボタン群 -->
       <div class="actions">
-        <button class="btn accent" id="downloadBtn">PNGでダウンロード</button>
-        <button class="btn ghost" id="sampleBtn">サンプルを見る</button>
+        <button class="btn ghost" id="animBtn">▶ アニメーション再生</button>
+        <button class="btn accent" id="downloadBtn">↓ 画像として保存</button>
       </div>
     </div>
 
@@ -280,7 +283,10 @@ var state = {
   showSub: true
 };
 
-var STORE_KEY = "donutReportData_v2";
+var STORE_KEY = "donutReportData_v3";
+var animId = null;
+var animStartTime = null;
+var ANIM_DURATION = 800; // アニメーションの長さ(ミリ秒)
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
@@ -343,7 +349,7 @@ function renderRows(){
       labelInput.value = r.label;
       labelInput.addEventListener('input', function(){
         r.label = labelInput.value;
-        renderAll();
+        renderAll(false); // 文字入力時はアニメーションさせない
       });
 
       var valInput = document.createElement('input');
@@ -353,7 +359,7 @@ function renderRows(){
       valInput.min = 0;
       valInput.addEventListener('input', function(){
         r.value = parseFloat(valInput.value) || 0;
-        renderAll();
+        renderAll(false);
       });
 
       var colorInput = document.createElement('input');
@@ -362,7 +368,7 @@ function renderRows(){
       colorInput.value = r.color || colorForIndex(i);
       colorInput.addEventListener('input', function(){
         r.color = colorInput.value;
-        renderAll();
+        renderAll(false);
       });
 
       var delBtn = document.createElement('button');
@@ -370,7 +376,7 @@ function renderRows(){
       delBtn.textContent = '✕';
       delBtn.addEventListener('click', function(){
         state.rows.splice(i,1);
-        renderAll();
+        renderAll(true); // 削除時はアニメーションで再描画
       });
 
       div.appendChild(idx);
@@ -398,14 +404,16 @@ function renderPaletteRow(){
     btn.innerHTML = dotsHtml + '<span>' + pal.name + '</span>';
     btn.addEventListener('click', function(){
       state.paletteKey = key;
-      renderAll();
+      // 色変更時は全ての色をリセットしてパレットを適用
+      state.rows.forEach(r => r.color = null);
+      renderAll(true); 
     });
     wrap.appendChild(btn);
   });
 }
 
-// Core draw routine, reusable for both on-screen canvas and export canvas.
-function paintDonut(ctx, size, opts){
+// progress (0.0 〜 1.0) でアニメーションの進行度を受け取る
+function paintDonut(ctx, size, opts, progress){
   opts = opts || {};
   var cx = size/2, cy = size/2;
   var outerR = size*0.33;
@@ -413,7 +421,9 @@ function paintDonut(ctx, size, opts){
   var labelR = outerR*1.16;   // where leader lines terminate
   var lineR  = outerR*1.03;   // where leader lines start
 
-  ctx.clearRect(0,0,size,size);
+  // 画像として保存した際に見やすくするため、白背景で塗りつぶす
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
 
   var total = state.rows.reduce(function(s,r){ return s + (r.value>0?r.value:0); }, 0);
 
@@ -437,7 +447,8 @@ function paintDonut(ctx, size, opts){
   state.rows.forEach(function(r, i){
     if(r.value <= 0) return;
     var frac = r.value/total;
-    var angle = frac * Math.PI*2;
+    // 進行度に応じて角度を計算
+    var angle = (frac * Math.PI*2) * progress;
     var a0 = startAngle + gap/2;
     var a1 = startAngle + angle - gap/2;
     if(a1 < a0) a1 = a0;
@@ -450,110 +461,130 @@ function paintDonut(ctx, size, opts){
     ctx.fillStyle = color;
     ctx.fill();
 
-    segs.push({ r:r, a0:a0, a1:a1, frac:frac, color:color, mid:(a0+a1)/2 });
-    startAngle += angle;
+    // ラベル表示用に最終的な中央角度などを保存
+    var fullAngle = frac * Math.PI*2;
+    var finalA0 = startAngle + gap/2;
+    var finalA1 = startAngle + fullAngle - gap/2;
+    segs.push({ r:r, a0:finalA0, a1:finalA1, frac:frac, color:color, mid:(finalA0+finalA1)/2 });
+    
+    startAngle += fullAngle; // 次の開始位置は全体の角度を足す
   });
 
-  // in-segment labels for large-enough slices; leader-line labels for small ones
-  var bigThreshold = 0.10;
-  var smallSegs = [];
+  // ラベルやテキストはアニメーションが完了（1.0）した時のみ描画する
+  if (progress >= 1.0) {
+    var bigThreshold = 0.15;
+    var smallSegs = [];
 
-  segs.forEach(function(seg){
-    var mid = seg.mid;
-    if(seg.frac >= bigThreshold){
-      var mr = (outerR+innerR)/2;
-      var lx = cx + Math.cos(mid)*mr;
-      var ly = cy + Math.sin(mid)*mr;
+    segs.forEach(function(seg){
+      var mid = seg.mid;
+      if(seg.frac >= bigThreshold){
+        var mr = (outerR+innerR)/2;
+        var lx = cx + Math.cos(mid)*mr;
+        var ly = cy + Math.sin(mid)*mr;
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.lineJoin = "round";
+        var nameSize = size*0.021;
+        var pctSize = size*0.03;
+        var outline = Math.max(2, size*0.005);
+        function strokedFill(txt, x, y){
+          ctx.strokeStyle = "rgba(255,255,255,0.8)";
+          ctx.lineWidth = outline;
+          ctx.strokeText(txt, x, y);
+          ctx.fillStyle = "#1c2620";
+          ctx.fillText(txt, x, y);
+        }
+        if(opts.showLabel && opts.showPercent){
+          ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
+          strokedFill(seg.r.label || '無題', lx, ly-pctSize*0.6);
+          ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
+          strokedFill(Math.round(seg.frac*100)+"%", lx, ly+pctSize*0.5);
+        } else if(opts.showPercent){
+          ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
+          strokedFill(Math.round(seg.frac*100)+"%", lx, ly);
+        } else if(opts.showLabel){
+          ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
+          strokedFill(seg.r.label || '無題', lx, ly);
+        }
+        ctx.restore();
+      } else if(opts.showLabel || opts.showPercent){
+        smallSegs.push(seg);
+      }
+    });
+
+    var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return a.mid-b.mid; });
+    var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return a.mid-b.mid; });
+
+    function placeLeaderLabels(list, side){
+      var n = list.length;
+      if(n===0) return;
+      var topY = cy - outerR*0.86;
+      var botY = cy + outerR*0.86;
+      var stepY = n>1 ? (botY-topY)/(n-1) : 0;
+      list.forEach(function(seg, i){
+        var startX = cx + Math.cos(seg.mid)*lineR;
+        var startY = cy + Math.sin(seg.mid)*lineR;
+        var targetY = n>1 ? topY + stepY*i : cy + Math.sin(seg.mid)*labelR;
+        var elbowX = cx + Math.cos(seg.mid)*labelR;
+        var endX = side==='right' ? size*0.965 : size*0.035;
+
+        ctx.save();
+        ctx.strokeStyle = seg.color;
+        ctx.lineWidth = Math.max(1.5, size*0.0022);
+        ctx.beginPath();
+        ctx.moveTo(startX,startY);
+        ctx.lineTo(elbowX, targetY);
+        ctx.lineTo(endX, targetY);
+        ctx.stroke();
+
+        ctx.fillStyle = seg.color;
+        ctx.beginPath();
+        ctx.arc(startX,startY, size*0.007, 0, Math.PI*2);
+        ctx.fill();
+
+        var namePart = opts.showLabel ? (seg.r.label || '無題') : "";
+        var pctPart = opts.showPercent ? Math.round(seg.frac*100)+"%" : "";
+
+        ctx.textBaseline = "middle";
+        ctx.textAlign = side==='right' ? 'right' : 'left';
+        var textX = side==='right' ? endX-size*0.012 : endX+size*0.012;
+
+        if(namePart && pctPart){
+          ctx.font = "700 "+(size*0.024)+"px 'Space Grotesk', sans-serif";
+          ctx.fillStyle = seg.color;
+          ctx.fillText(pctPart, textX, targetY - size*0.013);
+          ctx.font = "500 "+(size*0.018)+"px 'JetBrains Mono', monospace";
+          ctx.fillStyle = "#1c2620";
+          ctx.fillText(namePart, textX, targetY + size*0.014);
+        } else {
+          ctx.font = "700 "+(size*0.024)+"px 'Space Grotesk', sans-serif";
+          ctx.fillStyle = pctPart ? seg.color : "#1c2620";
+          ctx.fillText(pctPart || namePart, textX, targetY);
+        }
+        ctx.restore();
+      });
+    }
+    placeLeaderLabels(leftList, 'left');
+    placeLeaderLabels(rightList, 'right');
+
+    if(opts.showSub){
       ctx.save();
-      ctx.fillStyle = "#ffffff";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      var nameSize = size*0.021;
-      var pctSize = size*0.026;
-      var yOff = 0;
-      if(opts.showLabel && opts.showPercent){
-        ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
-        ctx.fillText(seg.r.label || '無題', lx, ly-pctSize*0.55);
-        ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
-        ctx.fillText(Math.round(seg.frac*100)+"%", lx, ly+pctSize*0.55);
-      } else if(opts.showPercent){
-        ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
-        ctx.fillText(Math.round(seg.frac*100)+"%", lx, ly);
-      } else if(opts.showLabel){
-        ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
-        ctx.fillText(seg.r.label || '無題', lx, ly);
-      }
-      ctx.restore();
-    } else if(opts.showLabel || opts.showPercent){
-      smallSegs.push(seg);
-    }
-  });
-
-  // leader-line labels for small slices, split left/right to avoid overlap
-  var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return a.mid-b.mid; });
-  var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return a.mid-b.mid; });
-
-  function placeLeaderLabels(list, side){
-    var n = list.length;
-    if(n===0) return;
-    var topY = cy - outerR*0.86;
-    var botY = cy + outerR*0.86;
-    var stepY = n>1 ? (botY-topY)/(n-1) : 0;
-    list.forEach(function(seg, i){
-      var startX = cx + Math.cos(seg.mid)*lineR;
-      var startY = cy + Math.sin(seg.mid)*lineR;
-      var targetY = n>1 ? topY + stepY*i : cy + Math.sin(seg.mid)*labelR;
-      var elbowX = cx + Math.cos(seg.mid)*labelR;
-      var endX = side==='right' ? size*0.965 : size*0.035;
-
-      ctx.save();
-      ctx.strokeStyle = seg.color;
-      ctx.lineWidth = Math.max(1, size*0.0018);
-      ctx.beginPath();
-      ctx.moveTo(startX,startY);
-      ctx.lineTo(elbowX, targetY);
-      ctx.lineTo(endX, targetY);
-      ctx.stroke();
-
-      ctx.fillStyle = seg.color;
-      ctx.beginPath();
-      ctx.arc(startX,startY, size*0.006, 0, Math.PI*2);
-      ctx.fill();
-
-      var txt = "";
-      if(opts.showLabel) txt += (seg.r.label || '無題');
-      if(opts.showLabel && opts.showPercent) txt += "  ";
-      if(opts.showPercent) txt += Math.round(seg.frac*100)+"%";
-
       ctx.fillStyle = "#1c2620";
-      ctx.font = "500 "+(size*0.019)+"px 'JetBrains Mono', monospace";
-      ctx.textBaseline = "middle";
-      ctx.textAlign = side==='right' ? 'right' : 'left';
-      var textX = side==='right' ? endX-size*0.012 : endX+size*0.012;
-      ctx.fillText(txt, textX, targetY);
+      var title = state.title || "";
+      if(title){
+        var titleSize = size*0.033;
+        ctx.font = "700 "+titleSize+"px 'Space Grotesk', sans-serif";
+        wrapCenterText(ctx, title, cx, cy - size*0.012, innerR*1.7, titleSize*1.15);
+      }
+      ctx.fillStyle = "#6f7a70";
+      ctx.font = (size*0.017)+"px 'JetBrains Mono', monospace";
+      var subY = title ? cy + size*0.035 : cy;
+      ctx.fillText("n = "+total.toLocaleString('ja-JP'), cx, subY);
       ctx.restore();
-    });
-  }
-  placeLeaderLabels(leftList, 'left');
-  placeLeaderLabels(rightList, 'right');
-
-  // center title / total
-  if(opts.showSub){
-    ctx.save();
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = "#1c2620";
-    var title = state.title || "";
-    if(title){
-      var titleSize = size*0.033;
-      ctx.font = "700 "+titleSize+"px 'Space Grotesk', sans-serif";
-      wrapCenterText(ctx, title, cx, cy - size*0.012, innerR*1.7, titleSize*1.15);
     }
-    ctx.fillStyle = "#6f7a70";
-    ctx.font = (size*0.017)+"px 'JetBrains Mono', monospace";
-    var subY = title ? cy + size*0.035 : cy;
-    ctx.fillText("n = "+total.toLocaleString('ja-JP'), cx, subY);
-    ctx.restore();
   }
 }
 
@@ -581,75 +612,92 @@ function wrapCenterText(ctx, text, cx, cy, maxWidth, lineHeight){
   });
 }
 
-function drawDonut(){
+function drawDonut(animate){
+  if(animId) {
+    cancelAnimationFrame(animId);
+    animId = null;
+  }
+  
   var canvas = document.getElementById('chartCanvas');
   var ctx = canvas.getContext('2d');
   var size = 560;
   var dpr = window.devicePixelRatio || 1;
   canvas.width = size * dpr;
   canvas.height = size * dpr;
-  canvas.style.width = size + 'px';
-  canvas.style.height = size + 'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
+  
+  if (animate) {
+    animStartTime = performance.now();
+    function frame(now) {
+      var elapsed = now - animStartTime;
+      var p = elapsed / ANIM_DURATION;
+      if (p > 1) p = 1;
+      
+      // イージング (easeOutQuart) で滑らかに減速
+      var easeP = 1 - Math.pow(1 - p, 4);
+      
+      paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub }, easeP);
+      
+      if (p < 1) {
+        animId = requestAnimationFrame(frame);
+      }
+    }
+    animId = requestAnimationFrame(frame);
+  } else {
+    // アニメーションなしですぐに描画 (1.0)
+    paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub }, 1.0);
+  }
 }
 
-function renderAll(){
+function renderAll(animate = false){
   renderRows();
   renderPaletteRow();
-  drawDonut();
+  drawDonut(animate);
   saveState();
 }
 
+// ボタンイベント
+document.getElementById('downloadBtn').addEventListener('click', function(){
+  // ダウンロード時はアニメーション完了状態のキャンバスを保存する
+  drawDonut(false); 
+  var canvas = document.getElementById('chartCanvas');
+  var link = document.createElement('a');
+  link.download = (state.title || 'donut-chart') + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
+
+document.getElementById('animBtn').addEventListener('click', function(){
+  drawDonut(true); // アニメーションを再再生
+});
+
 document.getElementById('chartTitle').addEventListener('input', function(e){
   state.title = e.target.value;
-  renderAll();
+  renderAll(false);
 });
 
 document.getElementById('addRowBtn').addEventListener('click', function(){
   state.rows.push({ id: uid(), label:"", value:0, color:null });
-  renderAll();
+  renderAll(true);
 });
 
 document.getElementById('showLabelChk').addEventListener('change', function(e){
   state.showLabel = e.target.checked;
-  renderAll();
+  renderAll(false);
 });
 document.getElementById('showPercentChk').addEventListener('change', function(e){
   state.showPercent = e.target.checked;
-  renderAll();
+  renderAll(false);
 });
 document.getElementById('showSubChk').addEventListener('change', function(e){
   state.showSub = e.target.checked;
-  renderAll();
+  renderAll(false);
 });
 
-document.getElementById('sampleBtn').addEventListener('click', function(){
-  seedSample();
-  document.getElementById('chartTitle').value = state.title;
-  renderAll();
-});
-
-document.getElementById('downloadBtn').addEventListener('click', function(){
-  var exportSize = 1200;
-  var out = document.createElement('canvas');
-  out.width = exportSize;
-  out.height = exportSize;
-  var octx = out.getContext('2d');
-  octx.fillStyle = "#ffffff";
-  octx.fillRect(0,0,exportSize,exportSize);
-  paintDonut(octx, exportSize, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
-
-  var link = document.createElement('a');
-  link.download = (state.title ? state.title.replace(/[\\/:*?"<>|]/g,'') : 'donut-chart') + '.png';
-  link.href = out.toDataURL('image/png');
-  link.click();
-});
-
-// init
+// 初期化（初回ロード時にアニメーション実行）
 loadState();
 document.getElementById('chartTitle').value = state.title;
-renderAll();
+renderAll(true);
 </script>
 </body>
 </html>
