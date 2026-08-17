@@ -3,508 +3,653 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>分析コード調書ジェネレーター | コピー＆DL機能搭載</title>
+<title>ドーナツグラフ ジェネレーター</title>
 <style>
-  :root { --navy: #16213e; --gold: #c9a227; --paper: #f4f1e8; --ink: #22293a; --border: #ccc; --colab-bg: #f8f9fa; }
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body { background: var(--paper); color: var(--ink); font-family: -apple-system, "Hiragino Kaku Gothic ProN", sans-serif; padding: 12px; font-size: 14px; }
-  main { max-width: 1400px; margin: auto; display: grid; grid-template-columns: 1fr; gap: 16px; }
-  .panel { background: #fff; padding: 14px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-  .section-box { border: 2px solid var(--navy); border-radius: 6px; padding: 14px; margin-bottom: 18px; background: #fafafa; }
-  .section-title { background: var(--navy); color: #fff; display: inline-block; padding: 4px 10px; border-radius: 4px; font-weight: bold; margin-top: -28px; margin-bottom: 10px; font-size: 12px; }
-  h2 { font-size: 13px; color: var(--navy); border-left: 4px solid var(--gold); padding-left: 8px; margin-top: 0; margin-bottom: 8px; }
-  h3 { font-size: 12px; color: #444; border-bottom: 1px dashed var(--border); padding-bottom: 4px; margin-bottom: 8px; margin-top: 15px; }
-  label { display: block; margin-bottom: 3px; font-weight: bold; font-size: 12px; color: #444; }
-  input[type="text"], select, textarea {
-    width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border);
-    border-radius: 4px; font-size: 16px; /* iOSでフォーカス時に自動ズームさせないための最小サイズ */
-  }
-  textarea { resize: vertical; min-height: 60px; font-family: monospace; font-size: 14px; }
-  button.generate {
-    background: #2e8b57; color: #fff; border: none; padding: 16px; width: 100%; border-radius: 6px;
-    cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 10px; transition: 0.2s;
-    -webkit-tap-highlight-color: transparent;
-  }
-  button.generate:active, button.generate:hover { background: #236b43; }
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .grid-3 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-  .grid-3 > div:first-child { grid-column: 1 / -1; }
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-  /* セルとボタンのスタイル */
-  .cell-container { margin-bottom: 18px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
-  .cell-header {
-    background: #eaeaea; padding: 10px 12px; font-weight: bold; font-size: 13px; border-bottom: 1px solid #ddd;
-    color: #333; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px;
+  :root{
+    --bg: #eceee6;
+    --surface: #ffffff;
+    --ink: #1c2620;
+    --ink-soft: #6f7a70;
+    --line: #d6dacd;
+    --accent: #ff6b45;
+    --accent-soft: rgba(255,107,69,0.10);
+    --teal: #2f6f5e;
   }
-  .cell-code {
-    background: var(--colab-bg); padding: 12px; margin: 0; font-family: 'Courier New', Consolas, monospace;
-    font-size: 12.5px; line-height: 1.5; overflow-x: auto; white-space: pre; color: #222;
-    -webkit-overflow-scrolling: touch; max-width: 100%;
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'JetBrains Mono', monospace;
+    min-height:100vh;
+    padding:36px 18px 80px;
   }
-  .auto-label { color: #d9534f; font-weight: normal; font-size: 10px; }
-  .action-btn {
-    background: #fff; border: 1px solid #aaa; padding: 9px 14px; border-radius: 5px; cursor: pointer;
-    font-size: 13px; min-height: 38px; transition: 0.2s; -webkit-tap-highlight-color: transparent;
-  }
-  .action-btn:active, .action-btn:hover { background: #e0e0e0; }
-  .header-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .wrap{ max-width:960px; margin:0 auto; }
 
-  /* タブレット・デスクトップ幅では左右2カラムに切り替え、コード側はスクロール固定表示 */
-  @media (min-width: 900px) {
-    main { grid-template-columns: 420px 1fr; align-items: start; }
-    .panel { max-height: 92vh; overflow-y: auto; position: sticky; top: 12px; }
-    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-    .grid-3 > div:first-child { grid-column: auto; }
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  header h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:26px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  header .tag{
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:.08em;
   }
 
-  /* iPhone幅では余白・フォント・ボタンを詰めてコンパクトに（入力欄の16pxだけは自動ズーム防止のため維持） */
-  @media (max-width: 480px) {
-    body { padding: 6px; font-size: 13px; }
-    main { gap: 10px; }
-    .panel { padding: 10px; }
-    .section-box { padding: 10px; margin-bottom: 12px; }
-    .section-title { font-size: 11px; padding: 3px 8px; margin-top: -24px; margin-bottom: 8px; }
-    h2 { font-size: 12px; }
-    h3 { font-size: 11px; margin-top: 10px; margin-bottom: 6px; }
-    label { font-size: 11px; margin-bottom: 2px; }
-    input[type="text"], select, textarea { padding: 7px 8px; margin-bottom: 6px; }
-    textarea { min-height: 44px; }
-    .grid-2, .grid-3 { gap: 6px; }
-    button.generate { padding: 12px; font-size: 15px; margin-top: 6px; }
-    .cell-container { margin-bottom: 12px; border-radius: 6px; }
-    .cell-header { padding: 7px 8px; font-size: 12px; gap: 4px; }
-    .cell-code { padding: 8px; font-size: 11.5px; line-height: 1.4; }
-    .action-btn { padding: 6px 9px; font-size: 11.5px; min-height: 32px; }
+  .grid{
+    display:grid;
+    grid-template-columns:1fr 1.25fr;
+    gap:22px;
+    align-items:start;
+  }
+  @media (max-width:780px){ .grid{ grid-template-columns:1fr; } }
+
+  .card{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:22px;
+  }
+
+  .panel-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:14px;
+    margin:0 0 16px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel-title .n{
+    width:20px;height:20px;
+    border-radius:50%;
+    background:var(--ink);
+    color:var(--bg);
+    font-size:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono', monospace;
+  }
+
+  .title-field{ margin-bottom:18px; }
+  .title-field label{
+    display:block;
+    font-size:10px;
+    letter-spacing:.1em;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .title-field input{
+    width:100%;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:16px;
+    padding:10px 12px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--bg);
+    color:var(--ink);
+  }
+  .title-field input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  #rows{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+  .row{
+    display:grid;
+    grid-template-columns:24px 1fr 78px 30px 22px;
+    align-items:center;
+    gap:8px;
+    padding:7px 8px;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:8px;
+  }
+  .row .idx{ font-size:10px; color:var(--ink-soft); text-align:center; }
+  .row input[type=text], .row input[type=number]{
+    font-family:'JetBrains Mono', monospace;
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--line);
+    padding:4px 2px;
+    font-size:13px;
+    color:var(--ink);
+    width:100%;
+  }
+  .row input:focus{ outline:none; border-bottom:1px solid var(--accent); }
+  .row .swatch{
+    width:18px;height:18px;
+    border-radius:50%;
+    border:1px solid rgba(0,0,0,0.2);
+    cursor:pointer;
+    padding:0;
+    appearance:none;
+    -webkit-appearance:none;
+    background:none;
+  }
+  .row .swatch::-webkit-color-swatch-wrapper{ padding:0; }
+  .row .swatch::-webkit-color-swatch{ border-radius:50%; border:none; }
+  .row .del{
+    background:none; border:none; cursor:pointer;
+    color:var(--ink-soft); font-size:15px; line-height:1;
+  }
+  .row .del:hover{ color:var(--accent); }
+
+  .add-row{
+    width:100%;
+    padding:10px;
+    background:none;
+    border:1.5px dashed var(--line);
+    border-radius:8px;
+    color:var(--ink-soft);
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:.06em;
+    cursor:pointer;
+    margin-bottom:20px;
+  }
+  .add-row:hover{ border-color:var(--accent); color:var(--accent); }
+
+  .field-label{ font-size:10px; color:var(--ink-soft); letter-spacing:.1em; margin-bottom:8px; display:block; }
+  .palette-picks{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .pal-btn{
+    border:1px solid var(--line);
+    background:var(--bg);
+    border-radius:8px;
+    padding:6px 10px;
+    font-size:10px;
+    letter-spacing:.04em;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    color:var(--ink-soft);
+  }
+  .pal-btn.active{ border-color:var(--ink); color:var(--ink); background:var(--surface); }
+  .pal-dots{ display:flex; }
+  .pal-dots i{ width:8px;height:8px;border-radius:50%;margin-left:-2px; display:inline-block; border:1px solid rgba(0,0,0,0.12); }
+
+  .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; }
+  .toggle-line label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
+
+  #chartWrap{ display:flex; justify-content:center; padding:6px 0 4px; position:relative; }
+  canvas#chartCanvas{ max-width:100%; }
+
+  .actions{ display:flex; gap:10px; margin-top:20px; flex-wrap:wrap; }
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:12px;
+    padding:11px 18px;
+    border:none;
+    border-radius:8px;
+    background:var(--ink);
+    color:var(--bg);
+    cursor:pointer;
+  }
+  .btn:hover{ background:#30392f; }
+  .btn.accent{ background:var(--accent); color:#fff; }
+  .btn.accent:hover{ background:#e85a35; }
+  .btn.ghost{ background:none; color:var(--ink); border:1px solid var(--line); }
+  .btn.ghost:hover{ border-color:var(--ink); }
+
+  footer{
+    text-align:center;
+    font-size:10px;
+    color:var(--ink-soft);
+    letter-spacing:.08em;
+    margin-top:36px;
   }
 </style>
-
 </head>
 <body>
-<main>
-  <div class="panel" id="sidebar">
-    <div class="grid-3">
+<div class="wrap">
+
+  <header>
+    <h1>ドーナツグラフ ジェネレーター</h1>
+    <div class="tag">構成比を、そのままシェアできる一枚に。</div>
+  </header>
+
+  <div class="grid">
+
+    <!-- LEFT: input -->
+    <div class="card">
+      <p class="panel-title"><span class="n">1</span>データを入力</p>
+
+      <div class="title-field">
+        <label>グラフタイトル（中央に表示）</label>
+        <input type="text" id="chartTitle" placeholder="例）採用フロー内訳">
+      </div>
+
+      <div id="rows"></div>
+      <button class="add-row" id="addRowBtn">＋ 項目を追加</button>
+
       <div>
-        <label>実行環境</label>
-        <select id="env_type" style="background: #e8f4f8; font-weight: bold;">
-          <option value="colab">Google Colab</option>
-          <option value="juno">Juno (iPad/iOS)</option>
-        </select>
+        <span class="field-label">配色</span>
+        <div class="palette-picks" id="paletteRow"></div>
       </div>
-      <div><label>分析者名</label><input type="text" id="author" value="Suzuki Shinya"></div>
-      <div><label>バージョン <span class="auto-label">(自動)</span></label><input type="text" id="version" readonly style="background: #eee;"></div>
+      <div class="toggle-line">
+        <label><input type="checkbox" id="showLabelChk" checked>項目名を表示</label>
+        <label><input type="checkbox" id="showPercentChk" checked>％を表示</label>
+        <label><input type="checkbox" id="showSubChk" checked>中央に合計を表示</label>
+      </div>
     </div>
 
-    <div class="section-box">
-      <div class="section-title">1. データ読込</div>
-      <div class="grid-2">
-        <div>
-          <label>ファイル形式</label>
-          <select id="filetype"><option value="csv">CSV</option><option value="excel">Excel (.xlsx)</option></select>
-        </div>
-        <div>
-          <label>エンコーディング</label>
-          <select id="encoding"><option value="auto">自動判定 (推奨)</option><option value="utf-8">UTF-8</option><option value="cp932">Shift-JIS (cp932)</option></select>
-        </div>
+    <!-- RIGHT: chart -->
+    <div class="card">
+      <p class="panel-title"><span class="n">2</span>プレビュー</p>
+      <div id="chartWrap">
+        <canvas id="chartCanvas" width="560" height="560"></canvas>
       </div>
-      <label>ファイルパス</label>
-      <input type="text" id="filepath" value="data.csv">
-      <p style="font-size:11px;color:#666;margin:-4px 0 0">コード1はこのファイルを全カラムそのまま読み込みます。まずコード1を実行してデータを確認してから、下の「2. カラム選択・クレンジング」に必要なカラムを入力してください。</p>
+      <div class="actions">
+        <button class="btn accent" id="downloadBtn">PNGでダウンロード</button>
+        <button class="btn ghost" id="sampleBtn">サンプルを見る</button>
+      </div>
     </div>
 
-    <div class="section-box">
-      <div class="section-title">2. カラム選択・クレンジング・特徴量生成</div>
-
-      <label>読み込むカラム (空白で全カラム)</label>
-      <input type="text" id="usecols" placeholder="例: 社員番号, 年齢, 売上">
-      <label>データ型の指定 (0落ち防止はstr等)</label>
-      <input type="text" id="dtypes" placeholder="例: 社員番号:str, 部署:category">
-      <label>日付型として読み込むカラム</label>
-      <input type="text" id="parse_dates" placeholder="例: 入社日">
-
-      <label>削除する不要カラム (IDや氏名など)</label>
-      <input type="text" id="drop_cols" placeholder="例: 社員番号, 氏名">
-
-      <label>中間データの保存ファイル名</label>
-      <input type="text" id="clean_filename" value="cleaned_data.csv">
-      
-      <div class="grid-2">
-        <div>
-          <label>欠損値の処理</label>
-          <select id="fillna">
-            <option value="median">数値は中央値、カテゴリは最頻値</option>
-            <option value="mean">数値は平均値、カテゴリは最頻値</option>
-            <option value="dropna">欠損を含む行を削除</option>
-          </select>
-        </div>
-        <div>
-          <label>外れ値の処理</label>
-          <select id="outlier_action">
-            <option value="none">処理しない</option>
-            <option value="clip">上位/下位 1%でクリッピング</option>
-          </select>
-        </div>
-      </div>
-
-      <label>日付カラムから 年/月/日/曜日 を抽出</label>
-      <input type="text" id="date_feat_cols" placeholder="例: 入社日, 契約日">
-
-      <div class="grid-2">
-        <div><label>フラグの数値化</label><input type="text" id="flag_cols" placeholder="例: 退職フラグ"></div>
-        <div><label>One-Hot Encoding</label><input type="text" id="cat_cols" placeholder="例: 部署名"></div>
-      </div>
-      
-      <label>新規特徴量作成 (Pandas式)</label>
-      <textarea id="feat_code" placeholder="df['単価'] = df['売上'] / df['数量']"></textarea>
-    </div>
-
-    <div class="section-box">
-      <div class="section-title">3. 統計検定 ＆ 機械学習</div>
-      
-      <h3>📊 統計検定 (オプション)</h3>
-      <div class="grid-2">
-        <div>
-          <label>検定手法</label>
-          <select id="test_type">
-            <option value="none">実行しない</option>
-            <option value="t_test">t検定 (2群の平均の差)</option>
-            <option value="chi2">カイ二乗検定 (カテゴリの独立性)</option>
-          </select>
-        </div>
-        <div>
-          <label>比較する群カラム</label>
-          <input type="text" id="test_group" placeholder="例: 部署名">
-        </div>
-      </div>
-      <label>対象カラム (t検定=数値, カイ二乗=カテゴリ)</label>
-      <input type="text" id="test_target" placeholder="例: 売上金額 (t検定) / 退職フラグ (カイ二乗)">
-
-      <h3>🤖 機械学習モデル</h3>
-      <label>目的変数</label>
-      <input type="text" id="target" placeholder="例: 利益">
-      <label>特徴量 (空白で目的変数以外すべて)</label>
-      <input type="text" id="feats" placeholder="例: 年齢, 勤続年数">
-      <div class="grid-2">
-        <div>
-          <label>タスク</label>
-          <select id="ml_task"><option value="reg">回帰 (数値予測)</option><option value="clf">分類 (確率予測)</option></select>
-        </div>
-        <div>
-          <label>アルゴリズム</label>
-          <select id="ml_algo">
-            <option value="lr">線形/ロジスティック回帰</option>
-            <option value="dt">決定木 (解釈容易)</option>
-            <option value="lgb">LightGBM (高精度)</option>
-          </select>
-        </div>
-      </div>
-      <label>特徴量のスケーリング (標準化)</label>
-      <select id="scale_action">
-        <option value="none">実行しない (ツリー系なら不要)</option>
-        <option value="standard">StandardScaler (線形モデル推奨)</option>
-      </select>
-    </div>
-
-    <button class="generate" id="generateBtn">🚀 パイプラインコードを一括生成</button>
   </div>
-  
-  <div class="panel" id="outputPanel" style="background: #fff; padding: 20px;">
-    <div style="text-align: center; color: #666; margin-top: 40px; line-height: 1.6;">
-      左側の設定を入力し、「一括生成」をクリックしてください。
-    </div>
-  </div>
-</main>
+
+  <footer>データ探偵事務所 — 単一HTMLファイル / オフライン動作 / データはブラウザ内にのみ保存</footer>
+</div>
 
 <script>
-function generateVersion() {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const hh = String(now.getHours()).padStart(2, '0');
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const ss = String(now.getSeconds()).padStart(2, '0');
-  return `v${yyyy}${mm}${dd}_${hh}${min}${ss}`;
+var PALETTES = {
+  "ember":  { name:"EMBER",   colors:["#ff6b45","#ffb26b","#2f6f5e","#1c2620","#c9a24b","#7a8f7f"] },
+  "sage":   { name:"SAGE",    colors:["#2f6f5e","#7a9e8e","#c9a24b","#1c2620","#ff6b45","#9fb3a6"] },
+  "cobalt": { name:"COBALT",  colors:["#2e4a72","#5b7fa6","#ff6b45","#1c2620","#8fa8c2","#c9a24b"] },
+  "berry":  { name:"BERRY",   colors:["#8a3a5c","#c26b8a","#2f6f5e","#1c2620","#e0a4b8","#ff6b45"] },
+  "mono":   { name:"MONO",    colors:["#1c2620","#465147","#6f7a70","#9aa495","#c3cbb8","#dfe3d5"] }
+};
+
+var state = {
+  title: "",
+  rows: [],
+  paletteKey: "ember",
+  showLabel: true,
+  showPercent: true,
+  showSub: true
+};
+
+var STORE_KEY = "donutReportData_v2";
+
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function loadState(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if(raw){
+      var parsed = JSON.parse(raw);
+      if(parsed && parsed.rows && parsed.rows.length){
+        state.title = parsed.title || "";
+        state.rows = parsed.rows;
+        state.paletteKey = parsed.paletteKey || "ember";
+        state.showLabel = parsed.showLabel !== false;
+        state.showPercent = parsed.showPercent !== false;
+        state.showSub = parsed.showSub !== false;
+        return;
+      }
+    }
+  }catch(e){}
+  seedSample();
 }
-document.getElementById('version').value = generateVersion();
 
-document.getElementById('generateBtn').addEventListener('click', function() {
-  const envType = document.getElementById('env_type').value;
-  const version = document.getElementById('version').value;
-  const author = document.getElementById('author').value || 'Suzuki Shinya';
-  const filetype = document.getElementById('filetype').value;
-  const filepath = document.getElementById('filepath').value;
-  const encoding = document.getElementById('encoding').value;
-  
-  const usecolsRaw = document.getElementById('usecols').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const dtypesRaw = document.getElementById('dtypes').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const parseDatesRaw = document.getElementById('parse_dates').value.split(',').map(s=>s.trim()).filter(s=>s);
-  
-  const dropColsRaw = document.getElementById('drop_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const cleanFilename = document.getElementById('clean_filename').value.trim() || 'cleaned_data.csv';
-  const fillna = document.getElementById('fillna').value;
-  const outlierAction = document.getElementById('outlier_action').value;
-  const dateFeatCols = document.getElementById('date_feat_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const flagCols = document.getElementById('flag_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const catCols = document.getElementById('cat_cols').value.split(',').map(s=>s.trim()).filter(s=>s);
-  const featCode = document.getElementById('feat_code').value.trim();
-  
-  const testType = document.getElementById('test_type').value;
-  const testGroup = document.getElementById('test_group').value.trim();
-  const testTargetCol = document.getElementById('test_target').value.trim();
-
-  const target = document.getElementById('target').value || 'target';
-  const featsStr = document.getElementById('feats').value.trim();
-  const mlTask = document.getElementById('ml_task').value;
-  const mlAlgo = document.getElementById('ml_algo').value;
-  const scaleAction = document.getElementById('scale_action').value;
-
-  function pipInstallBlock(packages) {
-    if (envType === 'colab') {
-      return `import subprocess, sys\n`
-        + `def _pip_install(*pkgs):\n`
-        + `    """ノートブックに貼っても、.pyとしてダウンロードして実行しても動く共通インストーラ"""\n`
-        + `    subprocess.run([sys.executable, "-m", "pip", "install", "-q", *pkgs], check=False)\n\n`
-        + `_pip_install(${packages.map(p => `"${p}"`).join(', ')})\n`;
-    }
-    return `# Juno環境のため自動インストールは行いません。\n`
-      + `# 未導入の場合はJunoのパッケージ管理から次を追加してください: ${packages.join(', ')}\n`;
-  }
-  const pipCmd1 = pipInstallBlock(['japanize-matplotlib']);
-  const pipCmd3 = pipInstallBlock(['shap', 'lightgbm', 'scikit-learn', 'scipy', 'japanize-matplotlib']);
-
-  let usecolsStr = usecolsRaw.length > 0 ? `, usecols=${JSON.stringify(usecolsRaw)}` : '';
-  let dtypeStr = '';
-  if (dtypesRaw.length > 0) {
-    let dtypeDict = dtypesRaw.map(pair => {
-      let parts = pair.split(':');
-      if(parts.length === 2) return `"${parts[0].trim()}": "${parts[1].trim()}"`;
-      return '';
-    }).filter(s=>s).join(', ');
-    if(dtypeDict) dtypeStr = `, dtype={${dtypeDict}}`;
-  }
-  let parseDatesStr = parseDatesRaw.length > 0 ? `, parse_dates=${JSON.stringify(parseDatesRaw)}` : '';
-  
-  function buildReadLogic(varName, applyColumnConfig) {
-    const uc = applyColumnConfig ? usecolsStr : '';
-    const dt = applyColumnConfig ? dtypeStr : '';
-    const pd_ = applyColumnConfig ? parseDatesStr : '';
-    if (filetype !== 'csv') {
-      return `${varName} = pd.read_excel('${filepath}'${uc}${dt}${pd_})`;
-    }
-    if (encoding === 'auto') {
-      return `def _read_csv_safely(path):\n`
-        + `    """文字コードを自動判定してCSVを読み込む"""\n`
-        + `    for enc in ["utf-8-sig", "cp932", "utf-8"]:\n`
-        + `        try:\n`
-        + `            return pd.read_csv(path, encoding=enc${uc}${dt}${pd_})\n`
-        + `        except UnicodeDecodeError:\n`
-        + `            continue\n`
-        + `    raise ValueError("文字コードを判定できませんでした: " + path)\n\n`
-        + `${varName} = _read_csv_safely('${filepath}')`;
-    }
-    return `${varName} = pd.read_csv('${filepath}', encoding='${encoding}'${uc}${dt}${pd_})`;
-  }
-
-  const cleanExport = cleanFilename;
-
-  // --- コード1作成 ---
-  let code1 = `"""
-【コード1】初期診断・プロファイリング（全カラムをそのまま読み込んで確認）
-"""
-${pipCmd1}import japanize_matplotlib
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-try:
-    from IPython.display import display
-except ImportError:
-    def display(x):
-        """Jupyter/Colab以外（ダウンロードした.pyの単体実行など）ではprintにフォールバック"""
-        print(x)
-
-${buildReadLogic('df_raw', false)}
-print(f"データサイズ: {df_raw.shape}\\n")
-
-print("=== データ型の確認 ===")
-df_raw.info()
-
-print("\\n=== 欠損値の状況 ===")
-missing = df_raw.isnull().sum()
-print(missing[missing > 0] if not missing[missing > 0].empty else "欠損値なし")
-
-print("\\n=== 基本統計量 ===")
-display(df_raw.describe(include='all'))
-
-num_cols = df_raw.select_dtypes(include=['int64', 'float64']).columns
-if len(num_cols) > 0:
-    df_raw[num_cols].hist(bins=30, figsize=(15, max(4, len(num_cols))), layout=(-1, 3), edgecolor='black')
-    plt.suptitle('数値変数のヒストグラム (全体分布の確認)', y=1.02)
-    plt.tight_layout()
-    plt.show()
-    
-    print("\\n=== 外れ値の検知 (箱ひげ図) ===")
-    num_plots = len(num_cols)
-    cols_per_row = 3
-    rows = (num_plots + cols_per_row - 1) // cols_per_row
-    
-    plt.figure(figsize=(15, rows * 4))
-    for i, col in enumerate(num_cols):
-        plt.subplot(rows, cols_per_row, i + 1)
-        sns.boxplot(x=df_raw[col], color='skyblue')
-        plt.title(col)
-    plt.tight_layout()
-    plt.show()
-`;
-
-  // --- コード2作成 ---
-  let code2 = `"""
-【コード2】前処理パイプラインと中間データ保存
-"""
-import pandas as pd
-import numpy as np
-
-${buildReadLogic('df', true)}
-`;
-  if (dropColsRaw.length > 0) code2 += `# 不要カラムの削除\ndf = df.drop(columns=${JSON.stringify(dropColsRaw)}, errors='ignore')\n\n`;
-  code2 += `# 文字列のベクトル化正規化\nfor col in df.select_dtypes(include=['object', 'string']).columns:\n    df[col] = df[col].astype(str).str.normalize('NFKC').str.strip()\n\n`;
-  
-  if (fillna === 'dropna') code2 += `# 欠損値処理\ndf = df.dropna()\n`;
-  else code2 += `# 欠損値処理\nfor col in df.columns:\n    if df[col].isnull().any():\n        if pd.api.types.is_numeric_dtype(df[col]):\n            fill_val = df[col].${fillna}()\n        else:\n            _mode = df[col].mode()\n            fill_val = _mode[0] if len(_mode) > 0 else ""\n        df[col] = df[col].fillna(fill_val)\n`;
-  
-  if (outlierAction === 'clip') code2 += `\n# 外れ値処理 (1%-99% クリッピング)\nnum_cols_for_clip = df.select_dtypes(include=['int64', 'float64']).columns\nfor col in num_cols_for_clip:\n    lower = df[col].quantile(0.01)\n    upper = df[col].quantile(0.99)\n    df[col] = df[col].clip(lower=lower, upper=upper)\n`;
-  if (dateFeatCols.length > 0) code2 += `\n# 日付からの特徴量抽出\nfor col in ${JSON.stringify(dateFeatCols)}:\n    if col in df.columns:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n        df[f"{col}_year"] = df[col].dt.year\n        df[f"{col}_month"] = df[col].dt.month\n        df[f"{col}_day"] = df[col].dt.day\n        df[f"{col}_dow"] = df[col].dt.dayofweek\n        df = df.drop(columns=[col])\n`;
-  if (flagCols.length > 0) code2 += `\n# フラグ数値化\nfor col in ${JSON.stringify(flagCols)}:\n    if col in df.columns:\n        u_vals = df[col].dropna().unique()\n        if len(u_vals) == 2:\n            df[col] = df[col].map({u_vals[0]: 0, u_vals[1]: 1})\n            print(f"フラグ変換: {col} は '{u_vals[0]}'→0, '{u_vals[1]}'→1 に変換されました")\n        else:\n            print(f"警告: {col} は値の種類が2種類ではないためフラグ変換をスキップしました ({len(u_vals)}種類)")\n`;
-  if (catCols.length > 0) code2 += `\n# One-Hot Encoding\ndf = pd.get_dummies(df, columns=[c for c in ${JSON.stringify(catCols)} if c in df.columns], drop_first=True)\n`;
-  if (featCode) code2 += `\n# 新規特徴量作成\n${featCode}\n`;
-
-  code2 += `\ndf.to_csv('${cleanExport}', index=False, encoding='utf-8-sig')\nprint(f"✅ 前処理完了: '${cleanExport}' として保存しました (サイズ: {df.shape})")\n`;
-
-  // --- コード3作成 ---
-  let code3 = `"""
-【コード3】統計検定 ＆ モデリング詳細評価 (Version: ${version})
-"""
-${pipCmd3}import japanize_matplotlib
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-import scipy.stats as stats
-import shap
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, accuracy_score, classification_report, confusion_matrix
-import datetime
-`;
-  if (mlAlgo === 'lgb') code3 += `import lightgbm as lgb\n`;
-  else if (mlAlgo === 'lr' && mlTask === 'reg') code3 += `from sklearn.linear_model import LinearRegression\n`;
-  else if (mlAlgo === 'lr' && mlTask === 'clf') code3 += `from sklearn.linear_model import LogisticRegression\n`;
-  else if (mlAlgo === 'dt' && mlTask === 'reg') code3 += `from sklearn.tree import DecisionTreeRegressor\nfrom sklearn import tree\n`;
-  else if (mlAlgo === 'dt' && mlTask === 'clf') code3 += `from sklearn.tree import DecisionTreeClassifier\nfrom sklearn import tree\n`;
-  
-  if (scaleAction === 'standard') code3 += `from sklearn.preprocessing import StandardScaler\n`;
-  code3 += `\ndf = pd.read_csv('${cleanExport}')\n`;
-
-  if (testType !== 'none' && testGroup && testTargetCol) {
-    code3 += `\n# --- 統計検定 ---\ngroup_col = '${testGroup}'\ntest_col = '${testTargetCol}'\n`;
-    if (testType === 't_test') code3 += `if group_col in df.columns and test_col in df.columns:\n    groups = df[group_col].dropna().unique()\n    if len(groups) == 2:\n        g1 = df[df[group_col] == groups[0]][test_col].dropna()\n        g2 = df[df[group_col] == groups[1]][test_col].dropna()\n        t_stat, p_val = stats.ttest_ind(g1, g2, equal_var=False)\n        print(f"Welchのt検定 p値: {p_val:.4e}")\n`;
-    else if (testType === 'chi2') code3 += `if group_col in df.columns and test_col in df.columns:\n    crosstab = pd.crosstab(df[group_col], df[test_col])\n    chi2, p_val, dof, ex = stats.chi2_contingency(crosstab)\n    print(f"カイ二乗検定 p値: {p_val:.4e}")\n`;
-  }
-
-  code3 += `\n# --- 機械学習モデリング ---\ntarget = '${target}'\n`;
-  if (featsStr) code3 += `features = ${JSON.stringify(featsStr.split(',').map(s=>s.trim()))}\n`;
-  else code3 += `features = [c for c in df.select_dtypes(include=np.number).columns if c != target]\n`;
-  
-  code3 += `X = df[features]\ny = df[target]\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)\n`;
-  
-  if (scaleAction === 'standard') code3 += `\nscaler = StandardScaler()\nX_train = pd.DataFrame(scaler.fit_transform(X_train), columns=X_train.columns, index=X_train.index)\nX_test = pd.DataFrame(scaler.transform(X_test), columns=X_test.columns, index=X_test.index)\n`;
-
-  let modelInst = '';
-  if (mlTask === 'reg') {
-    if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMRegressor(random_state=42)';
-    else if (mlAlgo === 'lr') modelInst = 'LinearRegression()';
-    else if (mlAlgo === 'dt') modelInst = 'DecisionTreeRegressor(max_depth=4, random_state=42)';
-    code3 += `\nmodel = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nprint(f"モデル MAE: {mean_absolute_error(y_test, pred):.2f}\\nモデル RMSE: {np.sqrt(mean_squared_error(y_test, pred)):.2f}\\nR2 Score: {r2_score(y_test, pred):.4f}")\n`;
-  } else {
-    if (mlAlgo === 'lgb') modelInst = 'lgb.LGBMClassifier(random_state=42)';
-    else if (mlAlgo === 'lr') modelInst = 'LogisticRegression(random_state=42, max_iter=1000)';
-    else if (mlAlgo === 'dt') modelInst = 'DecisionTreeClassifier(max_depth=4, random_state=42)';
-    code3 += `\nmodel = ${modelInst}.fit(X_train, y_train)\npred = model.predict(X_test)\nprint(f"Accuracy: {accuracy_score(y_test, pred):.1%}")\nprint(classification_report(y_test, pred))\n`;
-  }
-
-  code3 += `\n# --- SHAP要因分析 ---\n`;
-  if (mlAlgo === 'lr') code3 += `explainer = shap.LinearExplainer(model, X_train)\n`;
-  else code3 += `explainer = shap.TreeExplainer(model)\n`;
-  code3 += `shap_values = explainer.shap_values(X_test)\n`;
-  if (mlTask === 'clf') {
-    code3 += `# 分類タスク: SHAPのバージョンによって返り値の形が異なるため吸収する\n`;
-    code3 += `if isinstance(shap_values, list):\n    shap_values = shap_values[1]  # 二値分類: 陽性クラスへの寄与を使用\n`;
-    code3 += `shap_values = np.array(shap_values)\n`;
-    code3 += `if shap_values.ndim == 3:\n    shap_values = shap_values[:, :, 1]\n`;
-  }
-  code3 += `plt.figure(figsize=(10, 8))\nshap.summary_plot(shap_values, X_test)\n`;
-
-  const outputPanel = document.getElementById('outputPanel');
-  outputPanel.innerHTML = '';
-  
-  const cells = [
-    { title: '📝 コード1: 初期診断 (EDA)', code: code1 },
-    { title: '⚙️ コード2: 前処理パイプラインとCSV保存', code: code2 },
-    { title: '🚀 コード3: 統計検定 ＆ モデリング詳細評価', code: code3 }
+function seedSample(){
+  state.title = "採用フロー内訳";
+  state.rows = [
+    { id: uid(), label:"書類選考", value:120, color:null },
+    { id: uid(), label:"一次面接", value:58, color:null },
+    { id: uid(), label:"二次面接", value:27, color:null },
+    { id: uid(), label:"内定", value:9, color:null }
   ];
+}
 
-  cells.forEach((c, index) => {
-    const container = document.createElement('div');
-    container.className = 'cell-container';
+function saveState(){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }catch(e){}
+}
 
-    // ヘッダー部分（ボタン類を含む）
-    const header = document.createElement('div');
-    header.className = 'cell-header';
-    header.innerHTML = `<span>${c.title}</span><div class="header-btns"></div>`;
+function colorForIndex(i){
+  var pal = PALETTES[state.paletteKey].colors;
+  return pal[i % pal.length];
+}
 
-    // コピーボタンの生成
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'action-btn';
-    copyBtn.innerText = '📋 コピー';
-    copyBtn.onclick = () => {
-      navigator.clipboard.writeText(c.code).then(() => {
-        copyBtn.innerText = '✅ コピー完了';
-        copyBtn.style.color = '#2e8b57';
-        setTimeout(() => {
-          copyBtn.innerText = '📋 コピー';
-          copyBtn.style.color = '';
-        }, 2000);
+function renderRows(){
+  var wrap = document.getElementById('rows');
+  wrap.innerHTML = "";
+  for(var i=0;i<state.rows.length;i++){
+    (function(i){
+      var r = state.rows[i];
+      var div = document.createElement('div');
+      div.className = 'row';
+
+      var idx = document.createElement('div');
+      idx.className = 'idx';
+      idx.textContent = String(i+1).padStart(2,'0');
+
+      var labelInput = document.createElement('input');
+      labelInput.type = 'text';
+      labelInput.placeholder = '項目名';
+      labelInput.value = r.label;
+      labelInput.addEventListener('input', function(){
+        r.label = labelInput.value;
+        renderAll();
       });
-    };
 
-    // DLボタンの生成
-    const dlBtn = document.createElement('button');
-    dlBtn.className = 'action-btn';
-    dlBtn.innerText = '⬇️ DL (.py)';
-    dlBtn.onclick = () => {
-      const blob = new Blob([c.code], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cell${index + 1}_${version}.py`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
+      var valInput = document.createElement('input');
+      valInput.type = 'number';
+      valInput.placeholder = '数値';
+      valInput.value = r.value;
+      valInput.min = 0;
+      valInput.addEventListener('input', function(){
+        r.value = parseFloat(valInput.value) || 0;
+        renderAll();
+      });
 
-    header.querySelector('.header-btns').appendChild(copyBtn);
-    header.querySelector('.header-btns').appendChild(dlBtn);
+      var colorInput = document.createElement('input');
+      colorInput.type = 'color';
+      colorInput.className = 'swatch';
+      colorInput.value = r.color || colorForIndex(i);
+      colorInput.addEventListener('input', function(){
+        r.color = colorInput.value;
+        renderAll();
+      });
 
-    // コードブロックの生成
-    const pre = document.createElement('pre');
-    pre.className = 'cell-code';
-    pre.textContent = c.code;
+      var delBtn = document.createElement('button');
+      delBtn.className = 'del';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', function(){
+        state.rows.splice(i,1);
+        renderAll();
+      });
 
-    container.appendChild(header);
-    container.appendChild(pre);
-    outputPanel.appendChild(container);
+      div.appendChild(idx);
+      div.appendChild(labelInput);
+      div.appendChild(valInput);
+      div.appendChild(colorInput);
+      div.appendChild(delBtn);
+      wrap.appendChild(div);
+    })(i);
+  }
+}
+
+function renderPaletteRow(){
+  var wrap = document.getElementById('paletteRow');
+  wrap.innerHTML = "";
+  Object.keys(PALETTES).forEach(function(key){
+    var pal = PALETTES[key];
+    var btn = document.createElement('button');
+    btn.className = 'pal-btn' + (key === state.paletteKey ? ' active' : '');
+    var dotsHtml = '<span class="pal-dots">';
+    pal.colors.slice(0,4).forEach(function(c){
+      dotsHtml += '<i style="background:'+c+'"></i>';
+    });
+    dotsHtml += '</span>';
+    btn.innerHTML = dotsHtml + '<span>' + pal.name + '</span>';
+    btn.addEventListener('click', function(){
+      state.paletteKey = key;
+      renderAll();
+    });
+    wrap.appendChild(btn);
   });
+}
+
+// Core draw routine, reusable for both on-screen canvas and export canvas.
+function paintDonut(ctx, size, opts){
+  opts = opts || {};
+  var cx = size/2, cy = size/2;
+  var outerR = size*0.33;
+  var innerR = outerR*0.58;
+  var labelR = outerR*1.16;   // where leader lines terminate
+  var lineR  = outerR*1.03;   // where leader lines start
+
+  ctx.clearRect(0,0,size,size);
+
+  var total = state.rows.reduce(function(s,r){ return s + (r.value>0?r.value:0); }, 0);
+
+  if(total <= 0){
+    ctx.beginPath();
+    ctx.arc(cx,cy,outerR,0,Math.PI*2);
+    ctx.arc(cx,cy,innerR,0,Math.PI*2,true);
+    ctx.fillStyle = "#e3e6db";
+    ctx.fill('evenodd');
+    ctx.fillStyle = "#8f9a8f";
+    ctx.font = (size*0.026)+"px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("データを入力してください", cx, cy+innerR+size*0.06);
+    return;
+  }
+
+  var startAngle = -Math.PI/2;
+  var gap = 0.02;
+  var segs = [];
+
+  state.rows.forEach(function(r, i){
+    if(r.value <= 0) return;
+    var frac = r.value/total;
+    var angle = frac * Math.PI*2;
+    var a0 = startAngle + gap/2;
+    var a1 = startAngle + angle - gap/2;
+    if(a1 < a0) a1 = a0;
+    var color = r.color || colorForIndex(i);
+
+    ctx.beginPath();
+    ctx.arc(cx,cy,outerR,a0,a1);
+    ctx.arc(cx,cy,innerR,a1,a0,true);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    segs.push({ r:r, a0:a0, a1:a1, frac:frac, color:color, mid:(a0+a1)/2 });
+    startAngle += angle;
+  });
+
+  // in-segment labels for large-enough slices; leader-line labels for small ones
+  var bigThreshold = 0.10;
+  var smallSegs = [];
+
+  segs.forEach(function(seg){
+    var mid = seg.mid;
+    if(seg.frac >= bigThreshold){
+      var mr = (outerR+innerR)/2;
+      var lx = cx + Math.cos(mid)*mr;
+      var ly = cy + Math.sin(mid)*mr;
+      ctx.save();
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      var nameSize = size*0.021;
+      var pctSize = size*0.026;
+      var yOff = 0;
+      if(opts.showLabel && opts.showPercent){
+        ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
+        ctx.fillText(seg.r.label || '無題', lx, ly-pctSize*0.55);
+        ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
+        ctx.fillText(Math.round(seg.frac*100)+"%", lx, ly+pctSize*0.55);
+      } else if(opts.showPercent){
+        ctx.font = "700 "+pctSize+"px 'Space Grotesk', sans-serif";
+        ctx.fillText(Math.round(seg.frac*100)+"%", lx, ly);
+      } else if(opts.showLabel){
+        ctx.font = "500 "+nameSize+"px 'JetBrains Mono', monospace";
+        ctx.fillText(seg.r.label || '無題', lx, ly);
+      }
+      ctx.restore();
+    } else if(opts.showLabel || opts.showPercent){
+      smallSegs.push(seg);
+    }
+  });
+
+  // leader-line labels for small slices, split left/right to avoid overlap
+  var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return a.mid-b.mid; });
+  var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return a.mid-b.mid; });
+
+  function placeLeaderLabels(list, side){
+    var n = list.length;
+    if(n===0) return;
+    var topY = cy - outerR*0.86;
+    var botY = cy + outerR*0.86;
+    var stepY = n>1 ? (botY-topY)/(n-1) : 0;
+    list.forEach(function(seg, i){
+      var startX = cx + Math.cos(seg.mid)*lineR;
+      var startY = cy + Math.sin(seg.mid)*lineR;
+      var targetY = n>1 ? topY + stepY*i : cy + Math.sin(seg.mid)*labelR;
+      var elbowX = cx + Math.cos(seg.mid)*labelR;
+      var endX = side==='right' ? size*0.965 : size*0.035;
+
+      ctx.save();
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = Math.max(1, size*0.0018);
+      ctx.beginPath();
+      ctx.moveTo(startX,startY);
+      ctx.lineTo(elbowX, targetY);
+      ctx.lineTo(endX, targetY);
+      ctx.stroke();
+
+      ctx.fillStyle = seg.color;
+      ctx.beginPath();
+      ctx.arc(startX,startY, size*0.006, 0, Math.PI*2);
+      ctx.fill();
+
+      var txt = "";
+      if(opts.showLabel) txt += (seg.r.label || '無題');
+      if(opts.showLabel && opts.showPercent) txt += "  ";
+      if(opts.showPercent) txt += Math.round(seg.frac*100)+"%";
+
+      ctx.fillStyle = "#1c2620";
+      ctx.font = "500 "+(size*0.019)+"px 'JetBrains Mono', monospace";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = side==='right' ? 'right' : 'left';
+      var textX = side==='right' ? endX-size*0.012 : endX+size*0.012;
+      ctx.fillText(txt, textX, targetY);
+      ctx.restore();
+    });
+  }
+  placeLeaderLabels(leftList, 'left');
+  placeLeaderLabels(rightList, 'right');
+
+  // center title / total
+  if(opts.showSub){
+    ctx.save();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#1c2620";
+    var title = state.title || "";
+    if(title){
+      var titleSize = size*0.033;
+      ctx.font = "700 "+titleSize+"px 'Space Grotesk', sans-serif";
+      wrapCenterText(ctx, title, cx, cy - size*0.012, innerR*1.7, titleSize*1.15);
+    }
+    ctx.fillStyle = "#6f7a70";
+    ctx.font = (size*0.017)+"px 'JetBrains Mono', monospace";
+    var subY = title ? cy + size*0.035 : cy;
+    ctx.fillText("n = "+total.toLocaleString('ja-JP'), cx, subY);
+    ctx.restore();
+  }
+}
+
+function wrapCenterText(ctx, text, cx, cy, maxWidth, lineHeight){
+  var words = text.split(/(?<=[、,\s])/).length>1 ? text.split(/(?<=[、,\s])/) : text.split("");
+  var lines = [];
+  var current = "";
+  words.forEach(function(w){
+    var test = current + w;
+    if(ctx.measureText(test).width > maxWidth && current !== ""){
+      lines.push(current);
+      current = w;
+    } else {
+      current = test;
+    }
+  });
+  if(current) lines.push(current);
+  if(lines.length > 3){
+    lines = lines.slice(0,3);
+    lines[2] = lines[2].slice(0, Math.max(1,lines[2].length-1)) + "…";
+  }
+  var startY = cy - ((lines.length-1)*lineHeight)/2;
+  lines.forEach(function(line, i){
+    ctx.fillText(line, cx, startY + i*lineHeight);
+  });
+}
+
+function drawDonut(){
+  var canvas = document.getElementById('chartCanvas');
+  var ctx = canvas.getContext('2d');
+  var size = 560;
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
+}
+
+function renderAll(){
+  renderRows();
+  renderPaletteRow();
+  drawDonut();
+  saveState();
+}
+
+document.getElementById('chartTitle').addEventListener('input', function(e){
+  state.title = e.target.value;
+  renderAll();
 });
+
+document.getElementById('addRowBtn').addEventListener('click', function(){
+  state.rows.push({ id: uid(), label:"", value:0, color:null });
+  renderAll();
+});
+
+document.getElementById('showLabelChk').addEventListener('change', function(e){
+  state.showLabel = e.target.checked;
+  renderAll();
+});
+document.getElementById('showPercentChk').addEventListener('change', function(e){
+  state.showPercent = e.target.checked;
+  renderAll();
+});
+document.getElementById('showSubChk').addEventListener('change', function(e){
+  state.showSub = e.target.checked;
+  renderAll();
+});
+
+document.getElementById('sampleBtn').addEventListener('click', function(){
+  seedSample();
+  document.getElementById('chartTitle').value = state.title;
+  renderAll();
+});
+
+document.getElementById('downloadBtn').addEventListener('click', function(){
+  var exportSize = 1200;
+  var out = document.createElement('canvas');
+  out.width = exportSize;
+  out.height = exportSize;
+  var octx = out.getContext('2d');
+  octx.fillStyle = "#ffffff";
+  octx.fillRect(0,0,exportSize,exportSize);
+  paintDonut(octx, exportSize, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
+
+  var link = document.createElement('a');
+  link.download = (state.title ? state.title.replace(/[\\/:*?"<>|]/g,'') : 'donut-chart') + '.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+});
+
+// init
+loadState();
+document.getElementById('chartTitle').value = state.title;
+renderAll();
 </script>
 </body>
 </html>
