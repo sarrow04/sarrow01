@@ -223,7 +223,7 @@
 
       <div class="title-field">
         <label>グラフタイトル（中央に表示）</label>
-        <input type="text" id="chartTitle" placeholder="例）採用フロー内訳">
+        <input type="text" id="chartTitle" placeholder="例）阿佐ヶ谷の成分">
       </div>
 
       <div id="rows"></div>
@@ -271,7 +271,8 @@ var state = {
   showSub: true
 };
 
-var STORE_KEY = "donutReportData_v4";
+// キャッシュをリセットして初期データを適用するためキーを変更
+var STORE_KEY = "donutReportData_v5";
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
@@ -295,12 +296,12 @@ function loadState(){
 }
 
 function seedSample(){
-  state.title = "採用フロー内訳";
+  state.title = "阿佐ヶ谷の成分";
   state.rows = [
-    { id: uid(), label:"書類選考", value:120, color:null },
-    { id: uid(), label:"一次面接", value:58, color:null },
-    { id: uid(), label:"二次面接", value:27, color:null },
-    { id: uid(), label:"内定", value:9, color:null }
+    { id: uid(), label:"生活インフラ感", value:40, color:null },
+    { id: uid(), label:"夜の引力", value:30, color:null },
+    { id: uid(), label:"煮詰まったカルチャー", value:20, color:null },
+    { id: uid(), label:"季節の移ろい", value:10, color:null }
   ];
 }
 
@@ -487,21 +488,28 @@ function paintDonut(ctx, size, opts){
     }
   });
 
-  var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return a.mid-b.mid; });
-  var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return a.mid-b.mid; });
+  // 交差を避けるため、Y座標（Math.sin）順にソート
+  var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return Math.sin(a.mid) - Math.sin(b.mid); });
+  var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return Math.sin(a.mid) - Math.sin(b.mid); });
 
   function placeLeaderLabels(list, side){
     var n = list.length;
     if(n===0) return;
-    var topY = cy - outerR*0.86;
-    var botY = cy + outerR*0.86;
-    var stepY = n>1 ? (botY-topY)/(n-1) : 0;
+    
+    // 引き出し線同士の縦の間隔
+    var stepY = size * 0.08;
+    // グループ全体の中心Y座標を求める
+    var avgY = list.reduce(function(sum, s){ return sum + cy + Math.sin(s.mid)*labelR; }, 0) / n;
+    var blockTop = avgY - ((n - 1) * stepY) / 2;
+
     list.forEach(function(seg, i){
       var startX = cx + Math.cos(seg.mid)*lineR;
       var startY = cy + Math.sin(seg.mid)*lineR;
-      var targetY = n>1 ? topY + stepY*i : cy + Math.sin(seg.mid)*labelR;
-      var elbowX = cx + Math.cos(seg.mid)*labelR;
-      var endX = side==='right' ? size*0.965 : size*0.035;
+      var targetY = blockTop + i * stepY;
+      
+      // 折れ曲がるポイントのX座標を固定して見栄えを良くする
+      var elbowX = side === 'right' ? cx + labelR*0.8 : cx - labelR*0.8;
+      var endX = side === 'right' ? size*0.965 : size*0.035;
 
       ctx.save();
       ctx.strokeStyle = seg.color;
