@@ -57,6 +57,12 @@
   }
   @media (max-width:780px){ .grid{ grid-template-columns:1fr; } }
 
+  .input-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
   .card{
     background:var(--surface);
     border:1px solid var(--line);
@@ -184,17 +190,10 @@
   .pal-dots{ display:flex; }
   .pal-dots i{ width:8px;height:8px;border-radius:50%;margin-left:-2px; display:inline-block; border:1px solid rgba(0,0,0,0.12); }
 
-  .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; margin-bottom: 16px;}
+  .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; margin-bottom: 0;}
   .toggle-line label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
 
-  /* スマホでの長押し保存用 */
-  .save-hint {
-    font-size: 10px;
-    color: var(--accent);
-    text-align: center;
-    margin-bottom: 8px;
-  }
-
+  /* プレビューエリア */
   #chartWrap{ 
     display:flex; 
     justify-content:center; 
@@ -203,9 +202,11 @@
     aspect-ratio: 1 / 1; 
     position:relative; 
     background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
   }
   
-  /* Canvasの代わりに画像として書き出したものを表示する用 */
   #chartImage {
     width: 100%;
     height: 100%;
@@ -213,10 +214,97 @@
     object-fit: contain;
   }
   
-  /* 描画用のCanvasは非表示にしておく */
   canvas#chartCanvas{ 
     display: none; 
   }
+
+  .download-section {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  
+  .btn.accent {
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:14px;
+    padding:12px 24px;
+    border:none;
+    border-radius:8px;
+    background:var(--accent);
+    color:#fff;
+    cursor:pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+    max-width: 300px;
+  }
+  .btn.accent:hover {
+    background:#e85a35;
+    transform: translateY(-2px);
+  }
+
+  /* データ保存リスト用スタイル */
+  .save-data-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--ink);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+  }
+  .save-data-btn:hover {
+    background: #30392f;
+    transform: translateY(-1px);
+  }
+  
+  .saved-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .saved-item-name {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+  }
+  .saved-item-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .saved-item-btn {
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .saved-item-btn.load {
+    border: 1px solid var(--ink);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .saved-item-btn.del {
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--ink-soft);
+  }
+  .saved-item-btn.load:hover { background: var(--line); }
+  .saved-item-btn.del:hover { color: var(--accent); border-color: var(--accent); }
 
   footer{
     text-align:center;
@@ -237,38 +325,51 @@
 
   <div class="grid">
 
-    <div class="card">
-      <p class="panel-title"><span class="n">1</span>データを入力</p>
+    <div class="input-stack">
+      <div class="card">
+        <p class="panel-title"><span class="n">1</span>データを入力</p>
 
-      <div class="title-field">
-        <label>グラフタイトル（中央に表示）</label>
-        <input type="text" id="chartTitle" placeholder="例）阿佐ヶ谷の成分">
+        <div class="title-field">
+          <label>グラフタイトル（中央に表示）</label>
+          <input type="text" id="chartTitle" placeholder="例）荻窪">
+        </div>
+
+        <div id="rows"></div>
+        
+        <div class="action-row">
+          <button class="add-row" id="addRowBtn">＋ 項目を追加</button>
+          <button class="sort-row" id="sortBtn">↓ 多い順</button>
+        </div>
+
+        <div>
+          <span class="field-label">配色</span>
+          <div class="palette-picks" id="paletteRow"></div>
+        </div>
+        <div class="toggle-line">
+          <label><input type="checkbox" id="showLabelChk" checked>項目名を表示</label>
+          <label><input type="checkbox" id="showPercentChk" checked>％を表示</label>
+          <label><input type="checkbox" id="showSubChk" checked>中央に合計を表示</label>
+        </div>
       </div>
 
-      <div id="rows"></div>
-      
-      <div class="action-row">
-        <button class="add-row" id="addRowBtn">＋ 項目を追加</button>
-        <button class="sort-row" id="sortBtn">↓ 多い順</button>
-      </div>
-
-      <div>
-        <span class="field-label">配色</span>
-        <div class="palette-picks" id="paletteRow"></div>
-      </div>
-      <div class="toggle-line">
-        <label><input type="checkbox" id="showLabelChk" checked>項目名を表示</label>
-        <label><input type="checkbox" id="showPercentChk" checked>％を表示</label>
-        <label><input type="checkbox" id="showSubChk" checked>中央に合計を表示</label>
+      <div class="card">
+        <p class="panel-title"><span class="n">3</span>データを保存・読込</p>
+        <button class="save-data-btn" onclick="saveCurrentToList()">＋ 現在のデータをリストに保存</button>
+        <div id="savedListWrap"></div>
       </div>
     </div>
 
     <div class="card">
       <p class="panel-title"><span class="n">2</span>プレビュー</p>
-      <div class="save-hint">※画像を長押し（または右クリック）で保存できます</div>
+      <div style="font-size: 10px; color: var(--accent); text-align: center; margin-bottom: 8px;">
+        ※画像を長押し（または右クリック）で保存できます
+      </div>
       <div id="chartWrap">
-        <canvas id="chartCanvas" width="600" height="600"></canvas>
+        <canvas id="chartCanvas" width="800" height="800"></canvas>
         <img id="chartImage" alt="生成されたグラフ">
+      </div>
+      <div class="download-section">
+        <button class="btn accent" id="downloadBtn">↓ 画像として保存</button>
       </div>
     </div>
 
@@ -289,15 +390,101 @@ var PALETTES = {
 var state = {
   title: "",
   rows: [],
-  paletteKey: "ember",
+  paletteKey: "sage",
   showLabel: true,
   showPercent: true,
   showSub: true
 };
 
-var STORE_KEY = "donutReportData_v8";
+var STORE_KEY = "donutReportData_v10";
+var SAVED_LIST_KEY = "donutReportSavedList_v1"; // 保存データリスト用のキー
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
+
+// --- データリストの保存・読込処理 ---
+function getSavedList() {
+  try {
+    return JSON.parse(localStorage.getItem(SAVED_LIST_KEY)) || [];
+  } catch(e) { return []; }
+}
+
+function saveCurrentToList() {
+  var list = getSavedList();
+  var name = state.title || "無題のデータ";
+  
+  // 現在のstateをディープコピーして保存
+  var stateCopy = JSON.parse(JSON.stringify(state));
+  var id = 'saved_' + new Date().getTime();
+  
+  list.push({ id: id, name: name, data: stateCopy });
+  localStorage.setItem(SAVED_LIST_KEY, JSON.stringify(list));
+  renderSavedList();
+}
+
+function loadFromList(id) {
+  var list = getSavedList();
+  var target = list.find(function(item) { return item.id === id; });
+  if(target) {
+    state = JSON.parse(JSON.stringify(target.data));
+    
+    // UI側のチェックボックス等の状態も復元
+    document.getElementById('chartTitle').value = state.title;
+    document.getElementById('showLabelChk').checked = state.showLabel;
+    document.getElementById('showPercentChk').checked = state.showPercent;
+    document.getElementById('showSubChk').checked = state.showSub;
+    
+    renderAll();
+  }
+}
+
+function deleteFromList(id) {
+  if(!confirm("この保存データを削除しますか？")) return;
+  var list = getSavedList();
+  list = list.filter(function(item) { return item.id !== id; });
+  localStorage.setItem(SAVED_LIST_KEY, JSON.stringify(list));
+  renderSavedList();
+}
+
+function renderSavedList() {
+  var list = getSavedList();
+  var wrap = document.getElementById('savedListWrap');
+  wrap.innerHTML = "";
+  
+  if(list.length === 0) {
+    wrap.innerHTML = "<div style='font-size:11px; color:var(--ink-soft); text-align:center; padding:10px 0;'>保存されたデータはありません</div>";
+    return;
+  }
+  
+  // 新しいものが上に来るように逆順で表示
+  list.slice().reverse().forEach(function(item) {
+    var row = document.createElement('div');
+    row.className = 'saved-item';
+    
+    var nameSpan = document.createElement('div');
+    nameSpan.className = 'saved-item-name';
+    nameSpan.textContent = item.name;
+
+    var btnWrap = document.createElement('div');
+    btnWrap.className = 'saved-item-actions';
+
+    var loadBtn = document.createElement('button');
+    loadBtn.className = 'saved-item-btn load';
+    loadBtn.textContent = "読込";
+    loadBtn.onclick = function() { loadFromList(item.id); };
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'saved-item-btn del';
+    delBtn.textContent = "✕";
+    delBtn.onclick = function() { deleteFromList(item.id); };
+
+    btnWrap.appendChild(loadBtn);
+    btnWrap.appendChild(delBtn);
+    row.appendChild(nameSpan);
+    row.appendChild(btnWrap);
+    wrap.appendChild(row);
+  });
+}
+// ---------------------------------
 
 function loadState(){
   try{
@@ -307,10 +494,14 @@ function loadState(){
       if(parsed && parsed.rows && parsed.rows.length){
         state.title = parsed.title || "";
         state.rows = parsed.rows;
-        state.paletteKey = parsed.paletteKey || "ember";
+        state.paletteKey = parsed.paletteKey || "sage";
         state.showLabel = parsed.showLabel !== false;
         state.showPercent = parsed.showPercent !== false;
         state.showSub = parsed.showSub !== false;
+        
+        document.getElementById('showLabelChk').checked = state.showLabel;
+        document.getElementById('showPercentChk').checked = state.showPercent;
+        document.getElementById('showSubChk').checked = state.showSub;
         return;
       }
     }
@@ -319,14 +510,12 @@ function loadState(){
 }
 
 function seedSample(){
-  state.title = "阿佐ヶ谷の成分";
+  state.title = "荻窪";
   state.rows = [
-    { id: uid(), label:"七夕祭り", value:40, color:null },
-    { id: uid(), label:"パールセンター", value:25, color:null },
-    { id: uid(), label:"神明宮", value:10, color:null },
-    { id: uid(), label:"ジャズ", value:10, color:null },
-    { id: uid(), label:"通過駅", value:10, color:null },
-    { id: uid(), label:"飲み屋街", value:5, color:null }
+    { id: uid(), label:"お屋敷街の気品", value:35, color:null },
+    { id: uid(), label:"駅前の圧倒的利便性", value:30, color:null },
+    { id: uid(), label:"名店が放つ食の重厚感", value:25, color:null },
+    { id: uid(), label:"大人な知的好奇心", value:10, color:null }
   ];
 }
 
@@ -459,9 +648,8 @@ function renderPaletteRow(){
 function paintDonut(ctx, size, opts){
   opts = opts || {};
   
-  // テキスト領域を確保するため、ドーナツの中心を上にずらす
   var cx = size/2;
-  var cy = size * 0.44; 
+  var cy = size * 0.42; 
   
   var outerR = size * 0.27; 
   var innerR = outerR * 0.58;
@@ -627,23 +815,18 @@ function paintDonut(ctx, size, opts){
     ctx.restore();
   }
 
-  // --- 追加：フッターテキストの描画 ---
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  
-  // テキストの配置Y座標
   var footerTextY = size * 0.88;
 
-  // メインテキスト
   ctx.fillStyle = "#1c2620";
-  ctx.font = "bold " + (size*0.032) + "px 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif";
+  ctx.font = "bold " + (size*0.032) + "px 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif";
   var mainText = (state.title || "これ") + "の成分です。";
   ctx.fillText(mainText, cx, footerTextY);
 
-  // サブテキスト
   ctx.fillStyle = "#6f7a70";
-  ctx.font = "normal " + (size*0.022) + "px 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif";
+  ctx.font = "normal " + (size*0.022) + "px 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif";
   ctx.fillText("※主観が入っています。", cx, footerTextY + size*0.05);
   
   ctx.restore();
@@ -676,14 +859,12 @@ function wrapCenterText(ctx, text, cx, cy, maxWidth, lineHeight){
 function drawDonut(){
   var canvas = document.getElementById('chartCanvas');
   var ctx = canvas.getContext('2d');
-  // インスタ用の高画質を担保するためサイズを大きめに設定
   var size = 800; 
   canvas.width = size;
   canvas.height = size;
   
   paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
 
-  // 描画後、Canvasの内容を画像タグに反映（スマホ長押し保存用）
   var img = document.getElementById('chartImage');
   img.src = canvas.toDataURL('image/png');
 }
@@ -694,6 +875,14 @@ function renderAll(){
   drawDonut();
   saveState();
 }
+
+document.getElementById('downloadBtn').addEventListener('click', function(){
+  var canvas = document.getElementById('chartCanvas');
+  var link = document.createElement('a');
+  link.download = (state.title || 'donut-chart') + '_seibun.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+});
 
 document.getElementById('sortBtn').addEventListener('click', function(){
   state.rows.sort(function(a, b){
@@ -733,6 +922,7 @@ document.getElementById('showSubChk').addEventListener('change', function(e){
 loadState();
 document.getElementById('chartTitle').value = state.title;
 renderAll();
+renderSavedList(); // 保存リストの描画
 </script>
 </body>
 </html>
