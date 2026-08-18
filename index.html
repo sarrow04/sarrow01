@@ -107,7 +107,6 @@
   #rows{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
   .row{
     display:grid;
-    /* 並び替えボタン用にカラム幅を調整 */
     grid-template-columns:20px 1fr 64px 26px 44px 22px;
     align-items:center;
     gap:6px;
@@ -151,7 +150,6 @@
     gap: 8px;
     margin-bottom: 20px;
   }
-
   .add-row, .sort-row {
     padding:10px;
     background:none;
@@ -186,8 +184,16 @@
   .pal-dots{ display:flex; }
   .pal-dots i{ width:8px;height:8px;border-radius:50%;margin-left:-2px; display:inline-block; border:1px solid rgba(0,0,0,0.12); }
 
-  .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; }
+  .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; margin-bottom: 16px;}
   .toggle-line label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
+
+  /* スマホでの長押し保存用 */
+  .save-hint {
+    font-size: 10px;
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 8px;
+  }
 
   #chartWrap{ 
     display:flex; 
@@ -198,10 +204,18 @@
     position:relative; 
     background-color: var(--surface);
   }
+  
+  /* Canvasの代わりに画像として書き出したものを表示する用 */
+  #chartImage {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+  
+  /* 描画用のCanvasは非表示にしておく */
   canvas#chartCanvas{ 
-    width:100%; 
-    height:100%; 
-    display:block; 
+    display: none; 
   }
 
   footer{
@@ -223,7 +237,6 @@
 
   <div class="grid">
 
-    <!-- LEFT: input -->
     <div class="card">
       <p class="panel-title"><span class="n">1</span>データを入力</p>
 
@@ -234,7 +247,6 @@
 
       <div id="rows"></div>
       
-      <!-- ボタン並び -->
       <div class="action-row">
         <button class="add-row" id="addRowBtn">＋ 項目を追加</button>
         <button class="sort-row" id="sortBtn">↓ 多い順</button>
@@ -251,11 +263,12 @@
       </div>
     </div>
 
-    <!-- RIGHT: chart -->
     <div class="card">
       <p class="panel-title"><span class="n">2</span>プレビュー</p>
+      <div class="save-hint">※画像を長押し（または右クリック）で保存できます</div>
       <div id="chartWrap">
-        <canvas id="chartCanvas" width="560" height="560"></canvas>
+        <canvas id="chartCanvas" width="600" height="600"></canvas>
+        <img id="chartImage" alt="生成されたグラフ">
       </div>
     </div>
 
@@ -282,8 +295,7 @@ var state = {
   showSub: true
 };
 
-// キャッシュをリセット
-var STORE_KEY = "donutReportData_v7";
+var STORE_KEY = "donutReportData_v8";
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
@@ -373,7 +385,6 @@ function renderRows(){
         saveState();
       });
 
-      // 並び替えボタンのコンテナ
       var moveWrap = document.createElement('div');
       moveWrap.style.cssText = 'display:flex; gap:2px;';
       
@@ -447,9 +458,11 @@ function renderPaletteRow(){
 
 function paintDonut(ctx, size, opts){
   opts = opts || {};
-  var cx = size/2, cy = size/2;
   
-  // 修正箇所：スマホで見切れないよう、ドーナツのサイズを小さくして余白を確保
+  // テキスト領域を確保するため、ドーナツの中心を上にずらす
+  var cx = size/2;
+  var cy = size * 0.44; 
+  
   var outerR = size * 0.27; 
   var innerR = outerR * 0.58;
   var labelR = outerR * 1.16;
@@ -555,8 +568,6 @@ function paintDonut(ctx, size, opts){
       var targetY = blockTop + i * stepY;
       
       var elbowX = side === 'right' ? cx + labelR*0.8 : cx - labelR*0.8;
-      
-      // 修正箇所：文字がキャンバスの端にぶつからないよう、描画位置を少し内側へ移動
       var endX = side === 'right' ? size * 0.92 : size * 0.08;
 
       ctx.save();
@@ -615,6 +626,27 @@ function paintDonut(ctx, size, opts){
     ctx.fillText("n = "+total.toLocaleString('ja-JP'), cx, subY);
     ctx.restore();
   }
+
+  // --- 追加：フッターテキストの描画 ---
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  
+  // テキストの配置Y座標
+  var footerTextY = size * 0.88;
+
+  // メインテキスト
+  ctx.fillStyle = "#1c2620";
+  ctx.font = "bold " + (size*0.032) + "px 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif";
+  var mainText = (state.title || "これ") + "の成分です。";
+  ctx.fillText(mainText, cx, footerTextY);
+
+  // サブテキスト
+  ctx.fillStyle = "#6f7a70";
+  ctx.font = "normal " + (size*0.022) + "px 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif";
+  ctx.fillText("※主観が入っています。", cx, footerTextY + size*0.05);
+  
+  ctx.restore();
 }
 
 function wrapCenterText(ctx, text, cx, cy, maxWidth, lineHeight){
@@ -644,12 +676,16 @@ function wrapCenterText(ctx, text, cx, cy, maxWidth, lineHeight){
 function drawDonut(){
   var canvas = document.getElementById('chartCanvas');
   var ctx = canvas.getContext('2d');
-  var size = 560;
-  var dpr = window.devicePixelRatio || 1;
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+  // インスタ用の高画質を担保するためサイズを大きめに設定
+  var size = 800; 
+  canvas.width = size;
+  canvas.height = size;
+  
   paintDonut(ctx, size, { showLabel: state.showLabel, showPercent: state.showPercent, showSub: state.showSub });
+
+  // 描画後、Canvasの内容を画像タグに反映（スマホ長押し保存用）
+  var img = document.getElementById('chartImage');
+  img.src = canvas.toDataURL('image/png');
 }
 
 function renderAll(){
@@ -659,9 +695,7 @@ function renderAll(){
   saveState();
 }
 
-// ボタンイベントの登録
 document.getElementById('sortBtn').addEventListener('click', function(){
-  // 値が大きい順（降順）にソート
   state.rows.sort(function(a, b){
     return b.value - a.value;
   });
