@@ -107,9 +107,10 @@
   #rows{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
   .row{
     display:grid;
-    grid-template-columns:24px 1fr 78px 30px 22px;
+    /* 並び替えボタン用にカラム幅を調整 */
+    grid-template-columns:20px 1fr 64px 26px 44px 22px;
     align-items:center;
-    gap:8px;
+    gap:6px;
     padding:7px 8px;
     background:var(--bg);
     border:1px solid var(--line);
@@ -145,8 +146,13 @@
   }
   .row .del:hover{ color:var(--accent); }
 
-  .add-row{
-    width:100%;
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .add-row, .sort-row {
     padding:10px;
     background:none;
     border:1.5px dashed var(--line);
@@ -156,9 +162,10 @@
     font-size:12px;
     letter-spacing:.06em;
     cursor:pointer;
-    margin-bottom:20px;
   }
-  .add-row:hover{ border-color:var(--accent); color:var(--accent); }
+  .add-row { flex: 1; }
+  .sort-row { padding: 10px 16px; }
+  .add-row:hover, .sort-row:hover { border-color:var(--accent); color:var(--accent); }
 
   .field-label{ font-size:10px; color:var(--ink-soft); letter-spacing:.1em; margin-bottom:8px; display:block; }
   .palette-picks{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
@@ -182,7 +189,6 @@
   .toggle-line{ display:flex; align-items:center; gap:18px; font-size:11px; color:var(--ink-soft); flex-wrap:wrap; }
   .toggle-line label{ display:flex; align-items:center; gap:6px; cursor:pointer; }
 
-  /* プレビューエリアを正方形に強制 */
   #chartWrap{ 
     display:flex; 
     justify-content:center; 
@@ -217,6 +223,7 @@
 
   <div class="grid">
 
+    <!-- LEFT: input -->
     <div class="card">
       <p class="panel-title"><span class="n">1</span>データを入力</p>
 
@@ -226,7 +233,12 @@
       </div>
 
       <div id="rows"></div>
-      <button class="add-row" id="addRowBtn">＋ 項目を追加</button>
+      
+      <!-- ボタン並び -->
+      <div class="action-row">
+        <button class="add-row" id="addRowBtn">＋ 項目を追加</button>
+        <button class="sort-row" id="sortBtn">↓ 多い順</button>
+      </div>
 
       <div>
         <span class="field-label">配色</span>
@@ -239,6 +251,7 @@
       </div>
     </div>
 
+    <!-- RIGHT: chart -->
     <div class="card">
       <p class="panel-title"><span class="n">2</span>プレビュー</p>
       <div id="chartWrap">
@@ -269,8 +282,8 @@ var state = {
   showSub: true
 };
 
-// キャッシュをリセットして初期データを適用するためキーを変更
-var STORE_KEY = "donutReportData_v6";
+// キャッシュをリセット
+var STORE_KEY = "donutReportData_v7";
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
 
@@ -296,10 +309,12 @@ function loadState(){
 function seedSample(){
   state.title = "阿佐ヶ谷の成分";
   state.rows = [
-    { id: uid(), label:"生活インフラ感", value:40, color:null },
-    { id: uid(), label:"夜の引力", value:30, color:null },
-    { id: uid(), label:"煮詰まったカルチャー", value:20, color:null },
-    { id: uid(), label:"季節の移ろい", value:10, color:null }
+    { id: uid(), label:"七夕祭り", value:40, color:null },
+    { id: uid(), label:"パールセンター", value:25, color:null },
+    { id: uid(), label:"神明宮", value:10, color:null },
+    { id: uid(), label:"ジャズ", value:10, color:null },
+    { id: uid(), label:"通過駅", value:10, color:null },
+    { id: uid(), label:"飲み屋街", value:5, color:null }
   ];
 }
 
@@ -358,6 +373,37 @@ function renderRows(){
         saveState();
       });
 
+      // 並び替えボタンのコンテナ
+      var moveWrap = document.createElement('div');
+      moveWrap.style.cssText = 'display:flex; gap:2px;';
+      
+      var upBtn = document.createElement('button');
+      upBtn.textContent = '▲';
+      upBtn.style.cssText = 'background:none; border:1px solid var(--line); border-radius:4px; font-size:9px; padding:4px 3px; cursor:pointer; color:var(--ink-soft);';
+      upBtn.onclick = function() {
+        if(i > 0) {
+          var tmp = state.rows[i];
+          state.rows[i] = state.rows[i-1];
+          state.rows[i-1] = tmp;
+          renderAll();
+        }
+      };
+
+      var dnBtn = document.createElement('button');
+      dnBtn.textContent = '▼';
+      dnBtn.style.cssText = 'background:none; border:1px solid var(--line); border-radius:4px; font-size:9px; padding:4px 3px; cursor:pointer; color:var(--ink-soft);';
+      dnBtn.onclick = function() {
+        if(i < state.rows.length - 1) {
+          var tmp = state.rows[i];
+          state.rows[i] = state.rows[i+1];
+          state.rows[i+1] = tmp;
+          renderAll();
+        }
+      };
+
+      moveWrap.appendChild(upBtn);
+      moveWrap.appendChild(dnBtn);
+
       var delBtn = document.createElement('button');
       delBtn.className = 'del';
       delBtn.textContent = '✕';
@@ -370,6 +416,7 @@ function renderRows(){
       div.appendChild(labelInput);
       div.appendChild(valInput);
       div.appendChild(colorInput);
+      div.appendChild(moveWrap);
       div.appendChild(delBtn);
       wrap.appendChild(div);
     })(i);
@@ -401,10 +448,12 @@ function renderPaletteRow(){
 function paintDonut(ctx, size, opts){
   opts = opts || {};
   var cx = size/2, cy = size/2;
-  var outerR = size*0.33;
-  var innerR = outerR*0.58;
-  var labelR = outerR*1.16;
-  var lineR  = outerR*1.03;
+  
+  // 修正箇所：スマホで見切れないよう、ドーナツのサイズを小さくして余白を確保
+  var outerR = size * 0.27; 
+  var innerR = outerR * 0.58;
+  var labelR = outerR * 1.16;
+  var lineR  = outerR * 1.03;
 
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, size, size);
@@ -489,7 +538,6 @@ function paintDonut(ctx, size, opts){
     }
   });
 
-  // 交差を避けるため、Y座標（Math.sin）順にソート
   var leftList = smallSegs.filter(function(s){ return Math.cos(s.mid) < 0; }).sort(function(a,b){ return Math.sin(a.mid) - Math.sin(b.mid); });
   var rightList = smallSegs.filter(function(s){ return Math.cos(s.mid) >= 0; }).sort(function(a,b){ return Math.sin(a.mid) - Math.sin(b.mid); });
 
@@ -497,9 +545,7 @@ function paintDonut(ctx, size, opts){
     var n = list.length;
     if(n===0) return;
     
-    // 引き出し線同士の縦の間隔
-    var stepY = size * 0.08;
-    // グループ全体の中心Y座標を求める
+    var stepY = size * 0.085;
     var avgY = list.reduce(function(sum, s){ return sum + cy + Math.sin(s.mid)*labelR; }, 0) / n;
     var blockTop = avgY - ((n - 1) * stepY) / 2;
 
@@ -508,9 +554,10 @@ function paintDonut(ctx, size, opts){
       var startY = cy + Math.sin(seg.mid)*lineR;
       var targetY = blockTop + i * stepY;
       
-      // 折れ曲がるポイントのX座標を固定して見栄えを良くする
       var elbowX = side === 'right' ? cx + labelR*0.8 : cx - labelR*0.8;
-      var endX = side === 'right' ? size*0.965 : size*0.035;
+      
+      // 修正箇所：文字がキャンバスの端にぶつからないよう、描画位置を少し内側へ移動
+      var endX = side === 'right' ? size * 0.92 : size * 0.08;
 
       ctx.save();
       ctx.strokeStyle = seg.color;
@@ -611,6 +658,15 @@ function renderAll(){
   drawDonut();
   saveState();
 }
+
+// ボタンイベントの登録
+document.getElementById('sortBtn').addEventListener('click', function(){
+  // 値が大きい順（降順）にソート
+  state.rows.sort(function(a, b){
+    return b.value - a.value;
+  });
+  renderAll();
+});
 
 document.getElementById('chartTitle').addEventListener('input', function(e){
   state.title = e.target.value;
